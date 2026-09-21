@@ -4,6 +4,10 @@ import com.volta.ranking.dto.ApiResponseDTO;
 import com.volta.ranking.dto.AuthRequestDTO;
 import com.volta.ranking.dto.AuthResponseDTO;
 import com.volta.ranking.security.JwtService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,12 +19,29 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Tag(name = "Autenticação", description = "Login e geração de token JWT")
 public class AuthController {
 
     private final AuthenticationManager authManager;
     private final JwtService jwtService;
 
     @PostMapping("/login")
+    @Operation(
+        summary = "Autenticar e obter token JWT",
+        description = """
+            Usuários disponíveis para teste:
+
+            | Username    | Senha    | Role        | Acesso                          |
+            |-------------|----------|-------------|---------------------------------|
+            | funcionario | senha123 | FUNCIONARIO | GET apenas                      |
+            | gestor      | senha123 | GESTOR      | GET + POST (atualizar scores)   |
+            | admin       | senha123 | ADMIN       | Tudo (incluindo DELETE)         |
+            """
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Login realizado com sucesso"),
+        @ApiResponse(responseCode = "401", description = "Credenciais inválidas")
+    })
     public ResponseEntity<ApiResponseDTO<AuthResponseDTO>> login(
              @RequestBody AuthRequestDTO request) {
 
