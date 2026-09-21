@@ -1,6 +1,7 @@
 package com.volta.ranking.config;
 
 import com.volta.ranking.security.JwtAuthenticationFilter;
+import com.volta.ranking.security.RestAuthHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,6 +61,10 @@ public class SecurityConfig {
 
                 .anyRequest().authenticated()
             )
+            .exceptionHandling(e -> {
+                RestAuthHandler handler = new RestAuthHandler();
+                e.authenticationEntryPoint(handler).accessDeniedHandler(handler);
+            })
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
