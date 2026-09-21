@@ -39,6 +39,11 @@ public class SecurityConfig {
 
                 // ── Públicos ──────────────────────────────────────────────
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/api-docs/**"
+                ).permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
 
                 // ── Leitura: qualquer usuário autenticado ─────────────────
