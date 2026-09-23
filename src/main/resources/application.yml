@@ -1,0 +1,29 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: volta-api-redis
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+volta:
+  jwt:
+    # Mesma chave da volta-api (JWT_KEY): o token gerado lá precisa valer aqui.
+    # Sem valor padrão de propósito: o repositório é público.
+    secret: ${JWT_KEY}
+    expiration: ${JWT_EXPIRATION:86400000}
+
+  redis:
+    keys:
+      ranking: ranking:companies
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
