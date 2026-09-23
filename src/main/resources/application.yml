@@ -29,6 +29,7 @@ springdoc:
     path: /swagger-ui.html
     tags-sorter: alpha
     operations-sorter: alpha
+    display-request-duration: true
 
 management:
   endpoints:
