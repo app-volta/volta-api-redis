@@ -29,13 +29,15 @@ public class AuthController {
     @Operation(
         summary = "Autenticar e obter token JWT",
         description = """
-            Usuários disponíveis para teste:
+            Usuários de teste (senha de todos: `senha123`):
 
-            | Username    | Senha    | Role        | Acesso                          |
-            |-------------|----------|-------------|---------------------------------|
-            | funcionario | senha123 | FUNCIONARIO | GET apenas                      |
-            | gestor      | senha123 | GESTOR      | GET + POST (atualizar scores)   |
-            | admin       | senha123 | ADMIN       | Tudo (incluindo DELETE)         |
+            | Usuário     | Papel       |
+            |-------------|-------------|
+            | funcionario | FUNCIONARIO |
+            | gestor      | GESTOR      |
+            | admin       | ADMIN       |
+
+            As permissões de cada papel estão na descrição da API, no topo desta página.
             """
     )
     @ApiResponses({

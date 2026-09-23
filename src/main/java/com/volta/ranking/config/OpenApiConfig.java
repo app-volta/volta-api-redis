@@ -20,14 +20,15 @@ import org.springframework.context.annotation.Configuration;
             - Member → UUID da empresa
             - Score  → Pontuação (0–1000)
 
-            **Roles:**
-            | Role        | Permissões                          |
-            |-------------|-------------------------------------|
-            | FUNCIONARIO | Apenas leitura (GET)                |
-            | GESTOR      | Leitura + atualizar scores (POST)   |
-            | ADMIN       | Acesso total incluindo remoção      |
+            **Permissões por papel**
 
-            Faça login em `/api/v1/auth/login` e cole o token no cadeado acima.
+            | Papel       | Consultar | Gravar score | Remover |
+            |-------------|:---------:|:------------:|:-------:|
+            | FUNCIONARIO | ✅        | ❌           | ❌      |
+            | GESTOR      | ✅        | ✅           | ❌      |
+            | ADMIN       | ✅        | ✅           | ✅      |
+
+            Faça login em `/api/v1/auth/login` e informe o token no botão **Authorize**.
             """,
         contact = @Contact(name = "VOLTA Platform")
     )
