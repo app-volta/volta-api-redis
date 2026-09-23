@@ -63,6 +63,10 @@ public class RankingController {
         description = "Retorna as N empresas com maior pontuação.\n\n" +
                       "Redis: `ZREVRANGE ranking:companies 0 {N-1} WITHSCORES`"
     )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Top N retornado"),
+        @ApiResponse(responseCode = "400", description = "Limite fora da faixa de 1 a 100")
+    })
     public ResponseEntity<ApiResponseDTO<List<EmpresaRankingDTO>>> topN(
         @Parameter(description = "Quantidade a retornar (1–100)", example = "10")
         @RequestParam(defaultValue = "10")
@@ -87,6 +91,7 @@ public class RankingController {
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Posição encontrada"),
+        @ApiResponse(responseCode = "400", description = "UUID da empresa inválido"),
         @ApiResponse(responseCode = "404", description = "Empresa não está no ranking")
     })
     public ResponseEntity<ApiResponseDTO<PosicaoResponseDTO>> posicao(
@@ -110,6 +115,7 @@ public class RankingController {
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Pontuação retornada"),
+        @ApiResponse(responseCode = "400", description = "UUID da empresa inválido"),
         @ApiResponse(responseCode = "404", description = "Empresa não está no ranking")
     })
     public ResponseEntity<ApiResponseDTO<Double>> pontuacao(
@@ -176,6 +182,7 @@ public class RankingController {
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Empresa removida"),
+        @ApiResponse(responseCode = "400", description = "UUID da empresa inválido"),
         @ApiResponse(responseCode = "403", description = "Requer ADMIN"),
         @ApiResponse(responseCode = "404", description = "Empresa não está no ranking")
     })

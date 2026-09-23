@@ -43,6 +43,7 @@ public class AuthController {
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Login realizado com sucesso"),
+        @ApiResponse(responseCode = "400", description = "Usuário ou senha ausentes ou grandes demais"),
         @ApiResponse(responseCode = "401", description = "Credenciais inválidas")
     })
     public ResponseEntity<ApiResponseDTO<AuthResponseDTO>> login(
