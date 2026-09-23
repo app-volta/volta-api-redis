@@ -21,6 +21,10 @@ Base: `/api/v1`
 
 Papéis: `FUNCIONARIO` (leitura) < `GESTOR` (leitura + atualizar score) < `ADMIN` (tudo). A autenticação é JWT (`Authorization: Bearer <token>`).
 
+## Documentação (Swagger)
+
+Com a API rodando: `http://localhost:8081/swagger-ui.html` (JSON em `/api-docs`). Use **Authorize** com o token do `/auth/login` para testar os endpoints protegidos.
+
 ## Estrutura
 
 ```
