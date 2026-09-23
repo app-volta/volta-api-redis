@@ -5,6 +5,7 @@ import com.volta.ranking.dto.EmpresaRankingDTO;
 import com.volta.ranking.dto.PosicaoResponseDTO;
 import com.volta.ranking.dto.ScoreUpdateRequestDTO;
 import com.volta.ranking.service.RankingService;
+import com.volta.ranking.validation.ValidationPatterns;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,8 +29,6 @@ import java.util.List;
 @Tag(name = "Ranking de Empresas", description = "Gerenciamento do ranking via Redis Sorted Set (ZSET)")
 @SecurityRequirement(name = "bearerAuth")
 public class RankingController {
-
-    private static final String UUID_REGEX = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
     private final RankingService rankingService;
 
@@ -66,7 +65,10 @@ public class RankingController {
     )
     public ResponseEntity<ApiResponseDTO<List<EmpresaRankingDTO>>> topN(
         @Parameter(description = "Quantidade a retornar (1–100)", example = "10")
-        @RequestParam(defaultValue = "10") @Min(value = 1, message = "Limite deve ser no mínimo 1") @Max(value = 100, message = "Limite deve ser no máximo 100") int limit
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "Limite deve ser no mínimo 1")
+        @Max(value = 100, message = "Limite deve ser no máximo 100")
+        int limit
     ) {
         return ResponseEntity.ok(ApiResponseDTO.success(
             "Top " + limit + " empresas.",
@@ -89,7 +91,8 @@ public class RankingController {
     })
     public ResponseEntity<ApiResponseDTO<PosicaoResponseDTO>> posicao(
         @Parameter(description = "UUID da empresa", example = "550e8400-e29b-41d4-a716-446655440000")
-        @Pattern(regexp = UUID_REGEX, message = "UUID da empresa inválido") @PathVariable String companyUuid
+        @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
+        @PathVariable String companyUuid
     ) {
         return ResponseEntity.ok(ApiResponseDTO.success(
             "Posição consultada com sucesso.",
@@ -111,7 +114,8 @@ public class RankingController {
     })
     public ResponseEntity<ApiResponseDTO<Double>> pontuacao(
         @Parameter(description = "UUID da empresa", example = "550e8400-e29b-41d4-a716-446655440000")
-        @Pattern(regexp = UUID_REGEX, message = "UUID da empresa inválido") @PathVariable String companyUuid
+        @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
+        @PathVariable String companyUuid
     ) {
         return ResponseEntity.ok(ApiResponseDTO.success(
             "Pontuação consultada.",
@@ -177,7 +181,8 @@ public class RankingController {
     })
     public ResponseEntity<ApiResponseDTO<Void>> remover(
         @Parameter(description = "UUID da empresa", example = "550e8400-e29b-41d4-a716-446655440000")
-        @Pattern(regexp = UUID_REGEX, message = "UUID da empresa inválido") @PathVariable String companyUuid
+        @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
+        @PathVariable String companyUuid
     ) {
         rankingService.removerDoRanking(companyUuid);
         return ResponseEntity.ok(ApiResponseDTO.success(

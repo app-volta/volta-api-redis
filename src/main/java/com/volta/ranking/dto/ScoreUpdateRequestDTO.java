@@ -1,5 +1,6 @@
 package com.volta.ranking.dto;
 
+import com.volta.ranking.validation.ValidationPatterns;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -13,7 +14,7 @@ public class ScoreUpdateRequestDTO {
         description = "UUID da empresa — mesmo UUID do PostgreSQL da volta-api",
         example = "550e8400-e29b-41d4-a716-446655440000"
     )
-    @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", message = "UUID da empresa inválido")
+    @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
     private String companyUuid;
 
     @NotNull(message = "A pontuação é obrigatória")
