@@ -51,6 +51,13 @@ class ScoreUpdateRequestDTOValidationTest {
         assertThat(erros.iterator().next().getPropertyPath()).hasToString("score");
     }
 
+    @ParameterizedTest
+    @ValueSource(doubles = {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    void scoreNaoNumericoOuInfinito_ehInvalido(double score) {
+        // O Redis recusa NaN ("resulting score is not a number") e um infinito quebraria a ordenação.
+        assertThat(validar(UUID_VALIDO, score, null)).isNotEmpty();
+    }
+
     @Test
     void scoreAusente_ehInvalido() {
         Set<ConstraintViolation<ScoreUpdateRequestDTO>> erros = validar(UUID_VALIDO, null, null);
