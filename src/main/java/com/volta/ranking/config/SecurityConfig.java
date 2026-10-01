@@ -45,6 +45,7 @@ public class SecurityConfig {
                     "/api-docs/**"
                 ).permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/error").permitAll()
 
                 // ── Leitura: qualquer usuário autenticado ─────────────────
                 .requestMatchers(HttpMethod.GET, "/api/v1/ranking/**")

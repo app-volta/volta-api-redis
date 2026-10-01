@@ -21,6 +21,18 @@ Base: `/api/v1`
 
 Papéis: `FUNCIONARIO` (leitura) < `GESTOR` (leitura + atualizar score) < `ADMIN` (tudo). A autenticação é JWT (`Authorization: Bearer <token>`).
 
+## Validação de entrada
+
+Requisições inválidas são recusadas com **`400 Bad Request`** antes de chegar ao Redis:
+
+| Campo | Regra |
+|---|---|
+| `score` (`POST /ranking/score`) | obrigatório, entre 0 e 1000 |
+| `companyUuid` (corpo e rota) | UUID no formato `8-4-4-4-12` em hexadecimal |
+| `motivo` | no máximo 255 caracteres |
+| `limit` (`GET /ranking/top`) | entre 1 e 100 |
+| `username` / `password` (`POST /auth/login`) | obrigatórios, no máximo 50 e 100 caracteres |
+
 ## Documentação (Swagger)
 
 Com a API rodando: `http://localhost:8081/swagger-ui.html` (JSON em `/api-docs`). Use **Authorize** com o token do `/auth/login` para testar os endpoints protegidos.
@@ -35,6 +47,7 @@ src/main/java/com/volta/ranking/
 ├── dto/          objetos de entrada e saída
 ├── config/       Redis, segurança e senha
 ├── security/     JWT (geração, validação e filtro) e usuários de demonstração
+├── validation/   constantes de validação compartilhadas (ex.: regex de UUID)
 └── exception/    exceções de domínio
 ```
 

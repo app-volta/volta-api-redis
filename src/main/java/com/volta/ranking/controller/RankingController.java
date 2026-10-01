@@ -5,12 +5,17 @@ import com.volta.ranking.dto.EmpresaRankingDTO;
 import com.volta.ranking.dto.PosicaoResponseDTO;
 import com.volta.ranking.dto.ScoreUpdateRequestDTO;
 import com.volta.ranking.service.RankingService;
+import com.volta.ranking.validation.ValidationPatterns;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -58,9 +63,16 @@ public class RankingController {
         description = "Retorna as N empresas com maior pontuação.\n\n" +
                       "Redis: `ZREVRANGE ranking:companies 0 {N-1} WITHSCORES`"
     )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Top N retornado"),
+        @ApiResponse(responseCode = "400", description = "Limite fora da faixa de 1 a 100")
+    })
     public ResponseEntity<ApiResponseDTO<List<EmpresaRankingDTO>>> topN(
         @Parameter(description = "Quantidade a retornar (1–100)", example = "10")
-        @RequestParam(defaultValue = "10") int limit
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "Limite deve ser no mínimo 1")
+        @Max(value = 100, message = "Limite deve ser no máximo 100")
+        int limit
     ) {
         return ResponseEntity.ok(ApiResponseDTO.success(
             "Top " + limit + " empresas.",
@@ -79,11 +91,13 @@ public class RankingController {
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Posição encontrada"),
+        @ApiResponse(responseCode = "400", description = "UUID da empresa inválido"),
         @ApiResponse(responseCode = "404", description = "Empresa não está no ranking")
     })
     public ResponseEntity<ApiResponseDTO<PosicaoResponseDTO>> posicao(
         @Parameter(description = "UUID da empresa", example = "550e8400-e29b-41d4-a716-446655440000")
-         @PathVariable String companyUuid
+        @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
+        @PathVariable String companyUuid
     ) {
         return ResponseEntity.ok(ApiResponseDTO.success(
             "Posição consultada com sucesso.",
@@ -101,11 +115,13 @@ public class RankingController {
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Pontuação retornada"),
+        @ApiResponse(responseCode = "400", description = "UUID da empresa inválido"),
         @ApiResponse(responseCode = "404", description = "Empresa não está no ranking")
     })
     public ResponseEntity<ApiResponseDTO<Double>> pontuacao(
         @Parameter(description = "UUID da empresa", example = "550e8400-e29b-41d4-a716-446655440000")
-         @PathVariable String companyUuid
+        @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
+        @PathVariable String companyUuid
     ) {
         return ResponseEntity.ok(ApiResponseDTO.success(
             "Pontuação consultada.",
@@ -144,7 +160,7 @@ public class RankingController {
         @ApiResponse(responseCode = "403", description = "Requer GESTOR ou ADMIN")
     })
     public ResponseEntity<ApiResponseDTO<Void>> atualizarScore(
-         @RequestBody ScoreUpdateRequestDTO request
+        @Valid @RequestBody ScoreUpdateRequestDTO request
     ) {
         rankingService.adicionarOuAtualizarScore(request);
         return ResponseEntity.ok(ApiResponseDTO.success(
@@ -166,12 +182,14 @@ public class RankingController {
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Empresa removida"),
+        @ApiResponse(responseCode = "400", description = "UUID da empresa inválido"),
         @ApiResponse(responseCode = "403", description = "Requer ADMIN"),
         @ApiResponse(responseCode = "404", description = "Empresa não está no ranking")
     })
     public ResponseEntity<ApiResponseDTO<Void>> remover(
         @Parameter(description = "UUID da empresa", example = "550e8400-e29b-41d4-a716-446655440000")
-         @PathVariable String companyUuid
+        @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
+        @PathVariable String companyUuid
     ) {
         rankingService.removerDoRanking(companyUuid);
         return ResponseEntity.ok(ApiResponseDTO.success(
