@@ -33,6 +33,19 @@ Requisições inválidas são recusadas com **`400 Bad Request`** antes de chega
 | `limit` (`GET /ranking/top`) | entre 1 e 100 |
 | `username` / `password` (`POST /auth/login`) | obrigatórios, no máximo 50 e 100 caracteres |
 
+## Tratamento de erros
+
+Toda resposta de erro segue o mesmo envelope (`success`, `message`, `timestamp`, e `data` quando há detalhe por campo):
+
+| Status | Quando |
+|---|---|
+| `400` | corpo malformado, tipo de parâmetro inválido ou alguma regra da seção acima |
+| `401` | sem token, token inválido/expirado, ou login com credenciais erradas |
+| `403` | autenticado, mas sem o papel exigido pela rota |
+| `404` | rota inexistente, ou empresa não encontrada no ranking |
+| `405` | método HTTP não suportado na rota |
+| `500` | erro inesperado (inclui falha de conexão com o Redis) |
+
 ## Documentação (Swagger)
 
 Com a API rodando: `http://localhost:8081/swagger-ui.html` (JSON em `/api-docs`). Use **Authorize** com o token do `/auth/login` para testar os endpoints protegidos.
@@ -46,9 +59,10 @@ src/main/java/com/volta/ranking/
 ├── repository/   acesso ao Redis (RedisTemplate / ZSET)
 ├── dto/          objetos de entrada e saída
 ├── config/       Redis, segurança e senha
-├── security/     JWT (geração, validação e filtro) e usuários de demonstração
+├── security/     JWT (geração, validação e filtro), usuários de demonstração e
+│                 tratamento de erros do filtro de segurança (401/403)
 ├── validation/   constantes de validação compartilhadas (ex.: regex de UUID)
-└── exception/    exceções de domínio
+└── exception/    exceções de domínio e tratamento centralizado de erros
 ```
 
 ## Rodando localmente
