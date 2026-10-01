@@ -17,6 +17,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,7 @@ public class GlobalExceptionHandler {
                         .success(false)
                         .message("Erro de validação.")
                         .data(erros)
+                        .timestamp(LocalDateTime.now())
                         .build());
     }
 
@@ -76,6 +78,7 @@ public class GlobalExceptionHandler {
                         .success(false)
                         .message("Erro de validação.")
                         .data(erros)
+                        .timestamp(LocalDateTime.now())
                         .build());
     }
 
