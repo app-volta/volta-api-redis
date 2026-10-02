@@ -39,11 +39,16 @@ class ValidacaoHttpIntegrationTest {
     private final HttpClient http = HttpClient.newHttpClient();
 
     @Test
-    void scoreAcimaDoLimite_retorna400() throws Exception {
+    void scoreAcimaDoLimite_retorna400ComEnvelopePadrao() throws Exception {
         String token = login("admin", "senha123");
 
-        assertThat(post("/api/v1/ranking/score", token,
-                "{\"companyUuid\":\"" + UUID_VALIDO + "\",\"score\":5000}").statusCode()).isEqualTo(400);
+        HttpResponse<String> resposta = post("/api/v1/ranking/score", token,
+                "{\"companyUuid\":\"" + UUID_VALIDO + "\",\"score\":5000}");
+
+        assertThat(resposta.statusCode()).isEqualTo(400);
+        // Regressão: handleValidation() usava ApiResponseDTO.builder() sem chamar .timestamp(),
+        // diferente de todo o resto da API (que usa ApiResponseDTO.error()).
+        assertThat(resposta.body()).contains("\"timestamp\"");
     }
 
     @Test
@@ -72,10 +77,15 @@ class ValidacaoHttpIntegrationTest {
     }
 
     @Test
-    void limitForaDaFaixa_retorna400() throws Exception {
+    void limitForaDaFaixa_retorna400ComEnvelopePadrao() throws Exception {
         String token = login("admin", "senha123");
 
-        assertThat(get("/api/v1/ranking/top?limit=0", token).statusCode()).isEqualTo(400);
+        HttpResponse<String> resposta = get("/api/v1/ranking/top?limit=0", token);
+
+        assertThat(resposta.statusCode()).isEqualTo(400);
+        // Mesma regressão de handleValidation(), agora em handleMethodValidation()
+        // (@Min/@Max/@Pattern em parâmetros de rota e query, não no corpo).
+        assertThat(resposta.body()).contains("\"timestamp\"");
         assertThat(get("/api/v1/ranking/top?limit=101", token).statusCode()).isEqualTo(400);
     }
 

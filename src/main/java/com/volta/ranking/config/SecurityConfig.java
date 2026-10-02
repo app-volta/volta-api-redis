@@ -1,6 +1,8 @@
 package com.volta.ranking.config;
 
+import tools.jackson.databind.ObjectMapper;
 import com.volta.ranking.security.JwtAuthenticationFilter;
+import com.volta.ranking.security.RestAuthHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,7 +32,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   AuthenticationProvider authenticationProvider) throws Exception {
+                                                   AuthenticationProvider authenticationProvider,
+                                                   ObjectMapper objectMapper) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -61,6 +64,10 @@ public class SecurityConfig {
 
                 .anyRequest().authenticated()
             )
+            .exceptionHandling(e -> {
+                RestAuthHandler handler = new RestAuthHandler(objectMapper);
+                e.authenticationEntryPoint(handler).accessDeniedHandler(handler);
+            })
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
