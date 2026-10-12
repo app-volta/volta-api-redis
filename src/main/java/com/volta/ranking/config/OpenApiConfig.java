@@ -28,7 +28,7 @@ import org.springframework.context.annotation.Configuration;
             | GESTOR      | ✅        | ✅           | ❌      |
             | ADMIN       | ✅        | ✅           | ✅      |
 
-            Faça login em `/api/v1/auth/login` e informe o token no botão **Authorize**.
+            Use um JWT emitido pela `volta-api` no botão **Authorize**. O login de demonstração `/api/v1/auth/login` existe somente no perfil local.
             """,
         contact = @Contact(name = "VOLTA Platform")
     )
@@ -38,7 +38,7 @@ import org.springframework.context.annotation.Configuration;
     type = SecuritySchemeType.HTTP,
     scheme = "bearer",
     bearerFormat = "JWT",
-    description = "Token JWT gerado pelo endpoint /api/v1/auth/login"
+    description = "JWT emitido pela volta-api"
 )
 public class OpenApiConfig {
 }

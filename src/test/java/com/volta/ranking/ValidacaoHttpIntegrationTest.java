@@ -3,6 +3,7 @@ package com.volta.ranking;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.io.IOException;
 import java.net.URI;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "JWT_KEY=chave-de-teste-com-mais-de-256-bits-para-o-algoritmo-hs512-1234567890"
 )
+@ActiveProfiles("local")
 class ValidacaoHttpIntegrationTest {
 
     private static final String UUID_VALIDO = "550e8400-e29b-41d4-a716-446655440000";
