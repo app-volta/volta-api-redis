@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-pr:
+    if: github.event_name == 'pull_request'
+    uses: app-volta/volta-devops/.github/workflows/reusable-validate-pr.yaml@v1
+
+  build-test:
+    name: build-test
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build, testes e empacotamento
+        env:
+          JWT_KEY: test-key-with-at-least-256-bits-for-hs512-test-only
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: mvn --batch-mode verify
+
+      - name: Publicar relatório de testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-testes-surefire
+          path: target/surefire-reports/
+          retention-days: 5

@@ -1,8 +1,11 @@
 package com.volta.ranking;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.io.IOException;
 import java.net.URI;
@@ -10,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "JWT_KEY=chave-de-teste-com-mais-de-256-bits-para-o-algoritmo-hs512-1234567890"
 )
+@ActiveProfiles("local")
 class ErrorHandlingHttpIntegrationTest {
 
     private static final Pattern TOKEN = Pattern.compile("\"token\"\\s*:\\s*\"([^\"]+)\"");
@@ -48,6 +53,27 @@ class ErrorHandlingHttpIntegrationTest {
     @Test
     void tokenInvalido_retorna401() throws Exception {
         assertThat(get("/api/v1/ranking/total", "lixo.nao.valido").statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void jwtDaVoltaApi_comRoleEmployee_passaPeloFiltroDeSeguranca() throws Exception {
+        String token = Jwts.builder()
+                .subject("funcionario@volta.com")
+                .claim("userId", "770e8400-e29b-41d4-a716-446655440000")
+                .claim("companyId", "660e8400-e29b-41d4-a716-446655440000")
+                .claim("role", "EMPLOYEE")
+                .issuedAt(new java.util.Date())
+                .expiration(new java.util.Date(System.currentTimeMillis() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(
+                        "chave-de-teste-com-mais-de-256-bits-para-o-algoritmo-hs512-1234567890"
+                                .getBytes(StandardCharsets.UTF_8)))
+                .compact();
+
+        HttpResponse<String> resposta = get(
+                "/api/v1/cooperatives/nearby?latitude=90&longitude=0&radiusKm=10", token);
+
+        // 400 confirma que o JWT autenticou e passou autorização; a consulta não chega ao Redis.
+        assertThat(resposta.statusCode()).isEqualTo(400);
     }
 
     @Test

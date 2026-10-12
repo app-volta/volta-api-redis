@@ -21,6 +21,7 @@ volta:
   redis:
     keys:
       ranking: ranking:companies
+      cooperatives: geo:cooperatives
 
 springdoc:
   api-docs:
