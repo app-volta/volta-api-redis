@@ -54,9 +54,15 @@ Toda resposta de erro segue o mesmo envelope (`success`, `message`, `timestamp`,
 | `405` | método HTTP não suportado na rota |
 | `500` | erro inesperado (inclui falha de conexão com o Redis) |
 
+## Disponibilidade e sincronização do índice
+
+O readiness do Actuator inclui a conexão com o Redis; sem Redis, `/actuator/health/readiness` fica indisponível e o Kubernetes pode retirar o pod do tráfego. Se a chave GEO estiver vazia, a busca de proximidade retorna uma lista vazia com sucesso. O serviço não consegue distinguir um índice legitimamente vazio de um índice que ainda não foi sincronizado.
+
+Não há reindexação automática após perda ou limpeza do Redis. Cada localização pode ser gravada novamente por um usuário `ADMIN` com `PUT /api/v1/cooperatives/{cooperativeUuid}/location` e removida com `DELETE` na mesma rota. O mecanismo para carregar todo o conjunto do PostgreSQL e detectar uma sincronização incompleta ainda precisa ser definido entre os serviços.
+
 ## Documentação (Swagger)
 
-Com a API rodando: `http://localhost:8081/swagger-ui.html` (JSON em `/api-docs`). Use **Authorize** com o token do `/auth/login` para testar os endpoints protegidos.
+Swagger UI e `/api-docs` ficam habilitados somente no perfil `local`, em `http://localhost:8081/swagger-ui.html`. Fora dele, a documentação é desabilitada e as rotas são bloqueadas. Use **Authorize** com um token JWT para testar os endpoints protegidos.
 
 ## Estrutura
 
@@ -75,7 +81,9 @@ src/main/java/com/volta/ranking/
 
 ## Rodando localmente
 
-Requisitos: JDK 21, Maven 3.9+ e Docker. O login de demonstração só fica disponível com `SPRING_PROFILES_ACTIVE=local` e nunca deve ser ativado em produção.
+Requisitos: JDK 21, Maven 3.9+ e Docker. Copie `.env.example` para `.env` e substitua os valores de exemplo. O arquivo `.env` é ignorado pelo Git. Para executar a aplicação em Maven, exporte as variáveis no shell; para Docker, use `--env-file .env`.
+
+O perfil `local` habilita usuários de demonstração e deve ser usado somente na máquina local. Nunca use `SPRING_PROFILES_ACTIVE=local` em QA ou produção. Em ambientes compartilhados, configure os segredos no gerenciador de segredos do ambiente, não em arquivos versionados.
 
 ```bash
 # PowerShell: inicie um Redis local descartável
@@ -104,9 +112,13 @@ A API sobe em `http://localhost:8081`. Não há valor padrão para `JWT_KEY`: o 
 | `JWT_EXPIRATION` | `86400000` | Validade do token em ms |
 | `REDIS_HOST` | `localhost` | Host do Redis |
 | `REDIS_PORT` | `6379` | Porta do Redis |
+| `SPRING_DATA_REDIS_PASSWORD` | — | Senha opcional do Redis; configure em secret manager fora do local |
+| `SPRING_DATA_REDIS_SSL_ENABLED` | `false` | Ative (`true`) TLS quando o provedor Redis exigir conexão criptografada |
 | `SERVER_PORT` | `8081` | Porta HTTP |
 | `VOLTA_REDIS_KEYS_COOPERATIVES` | `geo:cooperatives` | Chave do índice GEO |
-| `SPRING_PROFILES_ACTIVE` | — | Use `local` apenas para habilitar login demo |
+| `SPRING_PROFILES_ACTIVE` | — | Use `local` somente na máquina local; habilita login de demonstração |
+
+O Redis é um índice derivado; o PostgreSQL da `volta-api` permanece como fonte da verdade. A API Redis ainda não implementa reconstrução automática do índice. Um índice vazio pode significar ausência de cooperativas cadastradas ou falta de sincronização; atualmente o serviço não distingue esses casos.
 
 ## Usuários de demonstração
 

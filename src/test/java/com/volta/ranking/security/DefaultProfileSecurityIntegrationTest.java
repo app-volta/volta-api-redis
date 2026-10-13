@@ -34,4 +34,30 @@ class DefaultProfileSecurityIntegrationTest {
 
         assertThat(response.statusCode()).isIn(401, 403);
     }
+
+    @Test
+    void readinessProbeEhPublicoERespondeComRedisDisponivel() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/actuator/health/readiness"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void swaggerNaoFicaDisponivelForaPerfilLocal() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api-docs"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(401);
+    }
 }
