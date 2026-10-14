@@ -14,8 +14,8 @@
     <groupId>com.volta</groupId>
     <artifactId>volta-api-redis</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>VOLTA Ranking API</name>
-    <description>API NoSQL - Ranking de Empresas com Redis (VOLTA Platform)</description>
+    <name>VOLTA Redis API</name>
+    <description>API Redis para ranking de empresas e busca geoespacial de cooperativas</description>
 
     <properties>
         <java.version>21</java.version>

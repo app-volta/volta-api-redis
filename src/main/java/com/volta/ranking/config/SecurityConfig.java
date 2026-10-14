@@ -37,15 +37,12 @@ public class SecurityConfig {
                 // ── Públicos ──────────────────────────────────────────────
                 if (environment.acceptsProfiles(Profiles.of("local"))) {
                     auth.requestMatchers("/api/v1/auth/**").permitAll();
+                    auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll();
                 } else {
                     auth.requestMatchers("/api/v1/auth/**").denyAll();
+                    auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").denyAll();
                 }
-                auth.requestMatchers(
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/api-docs/**"
-                ).permitAll();
-                auth.requestMatchers("/actuator/health", "/actuator/info").permitAll();
+                auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
                 auth.requestMatchers("/error").permitAll();
 
                 // ── Leitura: qualquer usuário autenticado ─────────────────

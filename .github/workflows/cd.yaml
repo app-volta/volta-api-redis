@@ -65,6 +65,9 @@ jobs:
   docker:
     name: docker
     needs: [setup, build-test]
+    permissions:
+      contents: read
+      packages: write
     uses: app-volta/volta-devops/.github/workflows/reusable-docker-build-push.yaml@v1
     with:
       image-name: api-redis

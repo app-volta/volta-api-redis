@@ -18,6 +18,7 @@ target/
 ### Segredos e configuração local (repositório público!) ###
 .env
 .env.*
+!.env.example
 application-local.yml
 application-local.properties
 
