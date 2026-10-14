@@ -48,6 +48,16 @@ jobs:
     name: build-test
     needs: setup
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
@@ -60,6 +70,10 @@ jobs:
           cache: maven
 
       - name: Build, testes e empacotamento
+        env:
+          JWT_KEY: test-key-with-at-least-256-bits-for-hs512-test-only
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
         run: mvn --batch-mode verify
 
   docker:
