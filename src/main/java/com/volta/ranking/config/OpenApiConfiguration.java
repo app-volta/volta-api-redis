@@ -48,7 +48,6 @@ public class OpenApiConfiguration {
     public static final String BEARER_AUTH = "bearerAuth";
 
     private static final String PROBLEM_DETAIL = "ProblemDetail";
-    private static final String PROBLEM_JSON = "application/problem+json";
 
     @Bean
     public OpenApiCustomizer globalResponsesCustomizer() {
@@ -82,7 +81,7 @@ public class OpenApiConfiguration {
 
     private Content problemDetailContent() {
         MediaType mediaType = new MediaType().schema(new Schema<>().$ref("#/components/schemas/" + PROBLEM_DETAIL));
-        return new Content().addMediaType(PROBLEM_JSON, mediaType);
+        return new Content().addMediaType("application/problem+json", mediaType);
     }
 
     private Schema<?> problemDetailSchema() {

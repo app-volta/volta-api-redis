@@ -1,12 +1,12 @@
 package com.volta.ranking.service;
 
-import com.volta.ranking.dto.ranking.CompanyPositionResponseDTO;
-import com.volta.ranking.dto.ranking.CompanyRankingResponseDTO;
-import com.volta.ranking.dto.ranking.CompanyScoreResponseDTO;
-import com.volta.ranking.dto.ranking.ScoreBatchRequestDTO;
-import com.volta.ranking.dto.ranking.ScoreBatchResponseDTO;
-import com.volta.ranking.dto.ranking.ScoreHistoryResponseDTO;
-import com.volta.ranking.dto.ranking.ScoreUpdateRequestDTO;
+import com.volta.ranking.dto.ranking.company.CompanyPositionResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyRankingResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyScoreResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreBatchRequestDTO;
+import com.volta.ranking.dto.ranking.score.ScoreBatchResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreHistoryResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreUpdateRequestDTO;
 import com.volta.ranking.exception.InvalidRequestException;
 import com.volta.ranking.exception.ResourceNotFoundException;
 import com.volta.ranking.mapper.RankingMapper;
@@ -107,8 +107,8 @@ class RankingServiceTest {
         ArgumentCaptor<ScoreHistoryResponseDTO> entries = ArgumentCaptor.forClass(ScoreHistoryResponseDTO.class);
         verify(scoreHistoryRepository, times(3)).save(anyString(), entries.capture());
         assertThat(entries.getAllValues()).extracting(ScoreHistoryResponseDTO::reason)
-                .containsExactly("Monthly recalculation", RankingService.BATCH_LOAD_REASON,
-                        RankingService.BATCH_LOAD_REASON);
+                .containsExactly("Monthly recalculation", "Batch load",
+                        "Batch load");
     }
 
     @Test
@@ -291,7 +291,7 @@ class RankingServiceTest {
         ArgumentCaptor<ScoreHistoryResponseDTO> entry = ArgumentCaptor.forClass(ScoreHistoryResponseDTO.class);
         verify(scoreHistoryRepository).save(eq(MY_COMPANY.toString()), entry.capture());
         assertThat(entry.getValue().score()).isNull();
-        assertThat(entry.getValue().reason()).isEqualTo(RankingService.REMOVAL_REASON);
+        assertThat(entry.getValue().reason()).isEqualTo("Removed from ranking");
         assertThat(entry.getValue().author()).isEqualTo("admin@volta.com");
     }
 

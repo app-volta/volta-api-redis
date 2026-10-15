@@ -1,4 +1,4 @@
-package com.volta.ranking.dto.ranking;
+package com.volta.ranking.dto.ranking.score;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;

@@ -1,5 +1,6 @@
 package com.volta.ranking.dto.ranking;
 
+import com.volta.ranking.dto.ranking.score.ScoreUpdateRequestDTO;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

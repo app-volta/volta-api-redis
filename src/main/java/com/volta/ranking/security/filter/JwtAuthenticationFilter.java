@@ -23,8 +23,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private final TokenProvider tokenProvider;
 
     @Override
@@ -35,8 +33,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String authorizationHeader = request.getHeader("Authorization");
 
-        if (StringUtils.hasText(authorizationHeader) && authorizationHeader.startsWith(BEARER_PREFIX)) {
-            String token = authorizationHeader.substring(BEARER_PREFIX.length());
+        if (StringUtils.hasText(authorizationHeader) && authorizationHeader.startsWith("Bearer ")) {
+            String token = authorizationHeader.substring("Bearer ".length());
             Optional<Claims> claims = tokenProvider.parseClaims(token);
 
             if (claims.isPresent()) {

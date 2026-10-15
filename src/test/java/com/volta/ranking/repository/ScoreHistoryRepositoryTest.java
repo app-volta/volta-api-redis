@@ -1,6 +1,6 @@
 package com.volta.ranking.repository;
 
-import com.volta.ranking.dto.ranking.ScoreHistoryResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreHistoryResponseDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -48,7 +48,7 @@ class ScoreHistoryRepositoryTest {
                 .contains("\"score\":950.0")
                 .contains("\"reason\":\"Collection completed\"")
                 .contains("\"author\":\"manager\"");
-        verify(listOperations).trim(KEY, 0, ScoreHistoryRepository.MAX_ENTRIES_PER_COMPANY - 1L);
+        verify(listOperations).trim(KEY, 0, 99);
     }
 
     @Test

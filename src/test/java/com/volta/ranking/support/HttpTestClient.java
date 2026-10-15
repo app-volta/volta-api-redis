@@ -13,8 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class HttpTestClient {
 
     private static final Pattern TOKEN = Pattern.compile("\"token\"\\s*:\\s*\"([^\"]+)\"");
-    private static final String DEMO_PASSWORD = "senha123";
-    private static final String JSON = "application/json";
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final int port;
@@ -24,7 +22,7 @@ public class HttpTestClient {
     }
 
     public String login(String user) {
-        String body = "{\"email\":\"" + user + "@volta.com\",\"password\":\"" + DEMO_PASSWORD + "\"}";
+        String body = "{\"email\":\"" + user + "@volta.com\",\"password\":\"senha123\"}";
         HttpResponse<String> response = post("/api/v1/auth/login", null, body);
 
         assertThat(response.statusCode()).as("login as %s", user).isEqualTo(200);
@@ -40,7 +38,7 @@ public class HttpTestClient {
 
     public HttpResponse<String> post(String path, String token, String json) {
         HttpRequest request = request(path, token)
-                .header("Content-Type", JSON)
+                .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
         return send(request);
@@ -48,7 +46,7 @@ public class HttpTestClient {
 
     public HttpResponse<String> put(String path, String token, String json) {
         HttpRequest request = request(path, token)
-                .header("Content-Type", JSON)
+                .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString(json))
                 .build();
         return send(request);

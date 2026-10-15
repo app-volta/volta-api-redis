@@ -23,6 +23,7 @@ Base: `/api/v1`. As respostas de sucesso devolvem o DTO diretamente, sem envelop
 | PUT | `/cooperatives/{cooperativeId}/location` | ADMIN | `204` | `GEOADD` |
 | DELETE | `/cooperatives/{cooperativeId}/location` | ADMIN | `204` | `ZREM` na chave GEO |
 | GET | `/cooperatives/nearby?latitude=...&longitude=...&radiusKm=...&limit=20` | qualquer perfil | `200` | `GEOSEARCH` |
+| GET | `/incidents/{incidentId}/cooperative-scores?radiusKm=100&limit=10` | qualquer perfil | `200` | — (consulta a `volta-api`) |
 
 A busca GEO devolve somente `cooperativeId` e `distanceKm` (distância em linha reta), ordenada pela menor distância. Latitude aceita entre `-85.051128` e `85.051128`; coordenadas salvas aceitam até seis casas decimais.
 
@@ -83,6 +84,86 @@ Erros de validação do corpo incluem o campo `errors`, com a mensagem de cada c
 | `405` | método HTTP não suportado na rota |
 | `500` | erro inesperado, inclui falha de conexão com o Redis |
 
+## Score de cooperativas para uma ocorrência
+
+`GET /api/v1/incidents/{incidentId}/cooperative-scores` calcula, aqui, o quanto cada cooperativa é adequada para receber uma ocorrência. Os dados vêm da `volta-api`: a ocorrência com a análise de IA do `volta-chatbot` (que a `volta-api` já guarda no relatório da ocorrência), a origem da ocorrência e as cooperativas, com latitude e longitude. A distância é calculada aqui (fórmula de Haversine, em linha reta). O resultado não é gravado: cada chamada recalcula.
+
+O token do usuário é repassado à `volta-api`, que continua aplicando o isolamento por empresa. Uma ocorrência de outra empresa responde `404`.
+
+### Quem entra na lista
+
+Uma cooperativa só é avaliada se atender às mesmas regras que a `volta-api` aplica ao solicitar a coleta:
+
+- a categoria do resíduo está nas especialidades da cooperativa;
+- quando o tipo de resíduo tem risco padrão `HIGH`, a cooperativa tem a especialidade `PERIGOSO`;
+- está dentro do raio informado (padrão 100 km, máximo 20.000 km).
+
+Resíduo `RADIOATIVO` responde `422`, porque não pode ser destinado a cooperativas. Ocorrência sem coordenadas de origem também responde `422`.
+
+### Como o score é calculado
+
+O score vai de 0 a 100 e é a média ponderada de três critérios, cada um de 0 a 1. Esta API não guarda cópia dos enums da `volta-api`: o contrato usa os valores como texto e só compara os que o cálculo exige (`PERIGOSO`, `RADIOATIVO`, `HIGH` e `CRITICAL`).
+
+| Critério | Cálculo |
+|---|---|
+| Proximidade | `1 - distância / raio`: 1 na origem, 0 na borda do raio |
+| Nota | `nota média / 5`. Cooperativa sem avaliação (nota 0 ou ausente) recebe 0,5 |
+| Adequação ao risco | 1 quando o risco não é alto ou a cooperativa tem `PERIGOSO`; 0,4 quando o risco é alto e ela não tem |
+
+A ocorrência tem risco alto (`highRisk` na resposta) quando o risco padrão do tipo de resíduo, a contaminação informada ou o `aiContaminationLevel` do relatório de IA é `HIGH`. É por aqui que a análise do `volta-chatbot` influencia o score: se a IA estimar contaminação `HIGH`, cooperativas sem `PERIGOSO` perdem pontos, sem serem excluídas.
+
+| Prioridade da ocorrência | Proximidade | Nota | Adequação |
+|---|---|---|---|
+| `HIGH` ou `CRITICAL` | 0,6 | 0,2 | 0,2 |
+| `LOW` ou `MEDIUM` | 0,4 | 0,3 | 0,3 |
+
+Os pesos, o valor neutro da nota, a penalidade de adequação e o raio padrão ficam em `volta.scoring.*` no `application.yml`. O empate é desfeito pela menor distância e depois pelo nome. A resposta traz o `breakdown` (0 a 100) de cada critério e o `highRisk` usado.
+
+### Contrato que a `volta-api` precisa expor
+
+Esta API consome dois endpoints de leitura da `volta-api`, ambos com `Authorization: Bearer <token do usuário>` e acessíveis a `ADMIN`, `MANAGER` e `EMPLOYEE`. Campos extras são ignorados.
+
+`GET /incidents/{id}/scoring-context`, restrito à empresa do usuário (`404` fora dela):
+
+```json
+{
+  "incidentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "priority": "HIGH",
+  "wasteType": { "category": "PERIGOSO", "defaultRiskLevel": "HIGH" },
+  "contaminationLevel": "MEDIUM",
+  "origin": { "latitude": -23.561684, "longitude": -46.655981 },
+  "aiReport": {
+    "detectedWasteType": "Óleo lubrificante",
+    "aiContaminationLevel": "HIGH",
+    "recommendations": "Isolar a área e acionar coleta especializada"
+  }
+}
+```
+
+- `priority` (`LOW`, `MEDIUM`, `HIGH` ou `CRITICAL`), `category`, `defaultRiskLevel` e `contaminationLevel` (`LOW`, `MEDIUM` ou `HIGH`) vão como texto, nos nomes canônicos da `volta-api`. `priority`, `wasteType.category` e `wasteType.defaultRiskLevel` são obrigatórios; sem eles a resposta é `502`.
+- `contaminationLevel` deve ser o nível já resolvido (informado ou, na falta, o risco padrão do tipo de resíduo).
+- `origin` é o ponto de onde a distância é medida. Hoje a empresa não tem latitude e longitude na `volta-api`; é preciso definir de onde esse ponto vem (sede da empresa ou da área).
+- `aiReport` pode ser `null` quando a ocorrência não tem análise de IA. Só o `aiContaminationLevel` entra no cálculo.
+
+`GET /cooperatives/scoring-data`, lista com os dados de todas as cooperativas (hoje `GET /cooperatives` é exclusivo do `ADMIN`):
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "name": "Cooperativa Recicla Sul",
+    "latitude": -23.561684,
+    "longitude": -46.655981,
+    "averageRating": 4.5,
+    "specialties": ["PAPEL", "PLASTICO", "PERIGOSO"]
+  }
+]
+```
+
+`specialties` é a lista de categorias já normalizadas pela `volta-api`, que é quem conhece o enum `WasteCategory`. Esta API compara os nomes exatamente, sem normalizar texto.
+
+Erros da `volta-api`: `404` vira `404`, `403` vira `403` e qualquer outra falha (incluindo timeout) vira `502`. A URL e o timeout são `VOLTA_API_URL` e `VOLTA_API_TIMEOUT_MILLIS`.
+
 ## Histórico de pontuação
 
 Cada alteração de score (`POST /ranking/score`, carga em lote e remoção) grava uma entrada com o valor, o `reason`, o autor e o momento em UTC. O Redis guarda as últimas 100 alterações de cada empresa, da mais recente para a mais antiga. A remoção do ranking mantém o histórico e registra a própria remoção.
@@ -120,17 +201,19 @@ Controller  →  UseCase (interface)  →  Service  →  Repository  →  Redis
 
 ```
 src/main/java/com/volta/ranking/
-├── config/        Redis, segurança, OpenAPI, codificador de senha e usuários locais
+├── config/        Redis, segurança, OpenAPI, cliente da volta-api, pesos do score e usuários locais
 ├── controller/    endpoints HTTP
 │   └── docs/      interfaces com as anotações do Swagger
 ├── usecase/       contratos dos casos de uso consumidos pelos controllers
-├── service/       regras de negócio e isolamento por empresa
+├── service/       regras de negócio, cálculo do score e isolamento por empresa
+├── client/        cliente HTTP da volta-api
 ├── mapper/        conversão das estruturas do Redis em DTOs
 ├── repository/    acesso ao Redis (ZSET, lista e GEO)
-├── dto/           DTOs de entrada e saída, por domínio (auth, ranking, cooperative)
+├── dto/           DTOs por domínio (auth, ranking, cooperative, scoring e voltaapi)
 ├── security/      usuário autenticado, filtro e provedor de JWT
 ├── handler/       tratamento global de erros e respostas 401/403
-└── exception/     exceções de negócio
+├── exception/     exceções de negócio
+└── utils/         cálculo de distância
 ```
 
 ## Rodando localmente
@@ -168,6 +251,8 @@ A API sobe em `http://localhost:8081`. Não há valor padrão para `JWT_KEY`: o 
 | `REDIS_PORT` | `6379` | Porta do Redis |
 | `SPRING_DATA_REDIS_PASSWORD` | — | Senha opcional do Redis; configure em secret manager fora do local |
 | `SPRING_DATA_REDIS_SSL_ENABLED` | `false` | Ative (`true`) TLS quando o provedor Redis exigir conexão criptografada |
+| `VOLTA_API_URL` | `http://localhost:8080` | URL da `volta-api`, usada no score de cooperativas |
+| `VOLTA_API_TIMEOUT_MILLIS` | `3000` | Timeout de conexão e leitura das chamadas à `volta-api` |
 | `SERVER_PORT` | `8081` | Porta HTTP |
 | `VOLTA_REDIS_KEYS_COOPERATIVES` | `geo:cooperatives` | Chave do índice GEO |
 | `SPRING_PROFILES_ACTIVE` | — | Use `local` somente na máquina local; habilita o login de demonstração |

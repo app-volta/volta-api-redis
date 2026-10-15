@@ -19,12 +19,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CooperativeGeoService implements CooperativeGeoUseCase {
 
-    private static final BigDecimal MAX_LATITUDE = new BigDecimal("85.051128");
-    private static final BigDecimal MAX_LONGITUDE = new BigDecimal("180");
-    private static final BigDecimal MAX_RADIUS_KM = new BigDecimal("20000");
-    private static final int MIN_LIMIT = 1;
-    private static final int MAX_LIMIT = 100;
-
     private final CooperativeGeoRepository cooperativeGeoRepository;
     private final CooperativeGeoMapper cooperativeGeoMapper;
 
@@ -42,25 +36,22 @@ public class CooperativeGeoService implements CooperativeGeoUseCase {
             BigDecimal radiusKm,
             int limit
     ) {
-        validateRange(latitude, MAX_LATITUDE, "Latitude");
-        validateRange(longitude, MAX_LONGITUDE, "Longitude");
-
-        if (radiusKm.signum() <= 0 || radiusKm.compareTo(MAX_RADIUS_KM) > 0) {
-            throw new InvalidRequestException("Radius must be greater than 0 and at most " + MAX_RADIUS_KM);
+        if (latitude.abs().compareTo(new BigDecimal("85.051128")) > 0) {
+            throw new InvalidRequestException("Latitude must be between -85.051128 and 85.051128");
         }
-        if (limit < MIN_LIMIT || limit > MAX_LIMIT) {
-            throw new InvalidRequestException("Limit must be between " + MIN_LIMIT + " and " + MAX_LIMIT);
+        if (longitude.abs().compareTo(new BigDecimal("180")) > 0) {
+            throw new InvalidRequestException("Longitude must be between -180 and 180");
+        }
+        if (radiusKm.signum() <= 0 || radiusKm.compareTo(new BigDecimal("20000")) > 0) {
+            throw new InvalidRequestException("Radius must be greater than 0 and at most 20000");
+        }
+        if (limit < 1 || limit > 100) {
+            throw new InvalidRequestException("Limit must be between 1 and 100");
         }
 
         GeoResults<RedisGeoCommands.GeoLocation<String>> results =
                 cooperativeGeoRepository.searchNearby(latitude, longitude, radiusKm, limit);
 
         return cooperativeGeoMapper.toResponses(results);
-    }
-
-    private void validateRange(BigDecimal value, BigDecimal maxAbsolute, String name) {
-        if (value.abs().compareTo(maxAbsolute) > 0) {
-            throw new InvalidRequestException(name + " must be between -" + maxAbsolute + " and " + maxAbsolute);
-        }
     }
 }

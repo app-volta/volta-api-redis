@@ -1,6 +1,6 @@
 package com.volta.ranking.repository;
 
-import com.volta.ranking.dto.ranking.ScoreHistoryResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreHistoryResponseDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -14,8 +14,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ScoreHistoryRepository {
 
-    static final int MAX_ENTRIES_PER_COMPANY = 100;
-
     private final RedisTemplate<String, String> redisTemplate;
     private final JsonMapper jsonMapper;
 
@@ -27,7 +25,7 @@ public class ScoreHistoryRepository {
         String json = jsonMapper.writeValueAsString(entry);
 
         redisTemplate.opsForList().leftPush(key, json);
-        redisTemplate.opsForList().trim(key, 0, MAX_ENTRIES_PER_COMPANY - 1L);
+        redisTemplate.opsForList().trim(key, 0, 99);
     }
 
     public List<ScoreHistoryResponseDTO> findByCompany(String companyId, int limit) {

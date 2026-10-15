@@ -23,10 +23,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfiguration {
 
-    private static final String[] READ_AUTHORITIES = {"ADMIN", "MANAGER", "EMPLOYEE", "OPERATOR"};
-    private static final String[] WRITE_AUTHORITIES = {"ADMIN", "MANAGER"};
-    private static final String ADMIN_AUTHORITY = "ADMIN";
-
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
@@ -55,17 +51,12 @@ public class SecurityConfiguration {
                     auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
                     auth.requestMatchers("/error").permitAll();
 
-                    auth.requestMatchers(HttpMethod.GET, "/api/v1/ranking/**").hasAnyAuthority(READ_AUTHORITIES);
-                    auth.requestMatchers(HttpMethod.POST, "/api/v1/ranking/**").hasAnyAuthority(WRITE_AUTHORITIES);
-                    auth.requestMatchers(HttpMethod.PUT, "/api/v1/ranking/**").hasAuthority(ADMIN_AUTHORITY);
-                    auth.requestMatchers(HttpMethod.DELETE, "/api/v1/ranking/**").hasAuthority(ADMIN_AUTHORITY);
+                    auth.requestMatchers(HttpMethod.POST, "/api/v1/ranking/**").hasAnyAuthority("ADMIN", "MANAGER");
+                    auth.requestMatchers(HttpMethod.PUT, "/api/v1/ranking/**").hasAuthority("ADMIN");
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/v1/ranking/**").hasAuthority("ADMIN");
 
-                    auth.requestMatchers(HttpMethod.GET, "/api/v1/cooperatives/nearby")
-                            .hasAnyAuthority(READ_AUTHORITIES);
-                    auth.requestMatchers(HttpMethod.PUT, "/api/v1/cooperatives/*/location")
-                            .hasAuthority(ADMIN_AUTHORITY);
-                    auth.requestMatchers(HttpMethod.DELETE, "/api/v1/cooperatives/*/location")
-                            .hasAuthority(ADMIN_AUTHORITY);
+                    auth.requestMatchers(HttpMethod.PUT, "/api/v1/cooperatives/*/location").hasAuthority("ADMIN");
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/v1/cooperatives/*/location").hasAuthority("ADMIN");
 
                     auth.anyRequest().authenticated();
                 })

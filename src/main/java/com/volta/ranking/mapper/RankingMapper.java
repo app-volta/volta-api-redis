@@ -1,6 +1,6 @@
 package com.volta.ranking.mapper;
 
-import com.volta.ranking.dto.ranking.CompanyRankingResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyRankingResponseDTO;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 

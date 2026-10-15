@@ -21,11 +21,10 @@ import java.util.UUID;
 public class LocalUsersConfiguration {
 
     public static final UUID DEMO_COMPANY_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
-    public static final String DEMO_PASSWORD = "senha123";
 
     @Bean
     public UserDetailsService localUserDetailsService(PasswordEncoder passwordEncoder) {
-        String encodedPassword = passwordEncoder.encode(DEMO_PASSWORD);
+        String encodedPassword = passwordEncoder.encode("senha123");
         Map<String, AuthenticatedUser> users = new HashMap<>();
 
         users.put("employee@volta.com", demoUser("employee@volta.com", encodedPassword, "EMPLOYEE"));

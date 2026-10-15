@@ -1,14 +1,14 @@
 package com.volta.ranking.controller;
 
 import com.volta.ranking.controller.docs.RankingControllerDocs;
-import com.volta.ranking.dto.ranking.CompanyPositionResponseDTO;
-import com.volta.ranking.dto.ranking.CompanyRankingResponseDTO;
-import com.volta.ranking.dto.ranking.CompanyScoreResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyPositionResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyRankingResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyScoreResponseDTO;
 import com.volta.ranking.dto.ranking.RankingTotalResponseDTO;
-import com.volta.ranking.dto.ranking.ScoreBatchRequestDTO;
-import com.volta.ranking.dto.ranking.ScoreBatchResponseDTO;
-import com.volta.ranking.dto.ranking.ScoreHistoryResponseDTO;
-import com.volta.ranking.dto.ranking.ScoreUpdateRequestDTO;
+import com.volta.ranking.dto.ranking.score.ScoreBatchRequestDTO;
+import com.volta.ranking.dto.ranking.score.ScoreBatchResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreHistoryResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreUpdateRequestDTO;
 import com.volta.ranking.security.AuthenticatedUser;
 import com.volta.ranking.usecase.RankingUseCase;
 import jakarta.validation.Valid;
