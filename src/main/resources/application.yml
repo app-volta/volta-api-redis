@@ -1,9 +1,13 @@
 server:
   port: 8081
+  shutdown: graceful
+  forward-headers-strategy: framework
 
 spring:
   application:
     name: volta-api-redis
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
   data:
     redis:
@@ -15,14 +19,13 @@ spring:
 
 volta:
   jwt:
-    # Mesma chave da volta-api (JWT_KEY): o token gerado lá precisa valer aqui.
-    # Sem valor padrão de propósito: o repositório é público.
     secret: ${JWT_KEY}
     expiration: ${JWT_EXPIRATION:86400000}
 
   redis:
     keys:
       ranking: ranking:companies
+      ranking-history: ranking:history
       cooperatives: geo:cooperatives
 
 springdoc:

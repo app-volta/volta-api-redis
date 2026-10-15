@@ -2,6 +2,7 @@ package com.volta.ranking.repository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResults;
 import org.springframework.data.geo.Point;
@@ -15,13 +16,16 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class CooperativeGeoRepositoryTest {
 
     private static final String KEY = "geo:cooperatives";
-    private static final UUID COOPERATIVE_UUID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    private static final UUID COOPERATIVE_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
 
     private final RedisTemplate<String, String> redisTemplate = mock(RedisTemplate.class);
     private final GeoOperations<String, String> geoOperations = mock(GeoOperations.class);
@@ -34,41 +38,43 @@ class CooperativeGeoRepositoryTest {
     }
 
     @Test
-    void saveLocation_usaLongitudeComoXELatitudeComoY() {
-        repository.saveLocation(COOPERATIVE_UUID, new BigDecimal("-23.550520"), new BigDecimal("-46.633308"));
+    void savesLocationWithLongitudeAsXAndLatitudeAsY() {
+        repository.saveLocation(COOPERATIVE_ID, new BigDecimal("-23.550520"), new BigDecimal("-46.633308"));
 
-        verify(geoOperations).add(eq(KEY), argThat(point ->
-                point.getX() == -46.633308 && point.getY() == -23.550520), eq(COOPERATIVE_UUID.toString()));
+        ArgumentCaptor<Point> point = ArgumentCaptor.forClass(Point.class);
+        verify(geoOperations).add(eq(KEY), point.capture(), eq(COOPERATIVE_ID.toString()));
+        assertThat(point.getValue().getX()).isEqualTo(-46.633308);
+        assertThat(point.getValue().getY()).isEqualTo(-23.550520);
     }
 
     @Test
-    void searchNearby_usaLongitudeLatitudeRaioEmKmEArgumentosOrdenados() {
-        @SuppressWarnings("unchecked")
+    void searchesByLongitudeLatitudeAndRadiusInKilometers() {
         GeoResults<RedisGeoCommands.GeoLocation<String>> results = mock(GeoResults.class);
         when(geoOperations.search(
                 eq(KEY), any(GeoReference.class), any(Distance.class), any(RedisGeoCommands.GeoSearchCommandArgs.class)
         )).thenReturn(results);
 
-        GeoResults<RedisGeoCommands.GeoLocation<String>> result = repository.searchNearby(
-                new BigDecimal("-23.550520"), new BigDecimal("-46.633308"), new BigDecimal("50"), 20
-        );
+        GeoResults<RedisGeoCommands.GeoLocation<String>> found = repository.searchNearby(
+                new BigDecimal("-23.550520"), new BigDecimal("-46.633308"), new BigDecimal("50"), 20);
 
-        assertThat(result).isSameAs(results);
-        @SuppressWarnings("unchecked")
-        var reference = org.mockito.ArgumentCaptor.forClass(GeoReference.class);
-        var distance = org.mockito.ArgumentCaptor.forClass(Distance.class);
-        var args = org.mockito.ArgumentCaptor.forClass(RedisGeoCommands.GeoSearchCommandArgs.class);
-        verify(geoOperations).search(eq(KEY), reference.capture(), distance.capture(), args.capture());
-        var coordinate = (GeoReference.GeoCoordinateReference<String>) reference.getValue();
+        assertThat(found).isSameAs(results);
+
+        ArgumentCaptor<GeoReference> reference = ArgumentCaptor.forClass(GeoReference.class);
+        ArgumentCaptor<Distance> distance = ArgumentCaptor.forClass(Distance.class);
+        verify(geoOperations).search(
+                eq(KEY), reference.capture(), distance.capture(), any(RedisGeoCommands.GeoSearchCommandArgs.class));
+
+        GeoReference.GeoCoordinateReference<String> coordinate =
+                (GeoReference.GeoCoordinateReference<String>) reference.getValue();
         assertThat(coordinate.getLongitude()).isEqualTo(-46.633308);
         assertThat(coordinate.getLatitude()).isEqualTo(-23.550520);
         assertThat(distance.getValue().getValue()).isEqualTo(50.0);
     }
 
     @Test
-    void removeLocation_removeOUuidDoIndiceGEO() {
-        repository.removeLocation(COOPERATIVE_UUID);
+    void removesCooperativeFromTheGeoIndex() {
+        repository.removeLocation(COOPERATIVE_ID);
 
-        verify(geoOperations).remove(KEY, COOPERATIVE_UUID.toString());
+        verify(geoOperations).remove(KEY, COOPERATIVE_ID.toString());
     }
 }
