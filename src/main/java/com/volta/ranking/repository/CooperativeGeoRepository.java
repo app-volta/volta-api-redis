@@ -5,11 +5,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResults;
 import org.springframework.data.geo.Metrics;
+import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.GeoOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
-import org.springframework.data.geo.Point;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -24,16 +24,13 @@ public class CooperativeGeoRepository {
     @Value("${volta.redis.keys.cooperatives}")
     private String cooperativesKey;
 
-    public void saveLocation(UUID cooperativeUuid, BigDecimal latitude, BigDecimal longitude) {
-        redisTemplate.opsForGeo().add(
-                cooperativesKey,
-                new Point(longitude.doubleValue(), latitude.doubleValue()),
-                cooperativeUuid.toString()
-        );
+    public void saveLocation(UUID cooperativeId, BigDecimal latitude, BigDecimal longitude) {
+        Point point = new Point(longitude.doubleValue(), latitude.doubleValue());
+        redisTemplate.opsForGeo().add(cooperativesKey, point, cooperativeId.toString());
     }
 
-    public void removeLocation(UUID cooperativeUuid) {
-        redisTemplate.opsForGeo().remove(cooperativesKey, cooperativeUuid.toString());
+    public void removeLocation(UUID cooperativeId) {
+        redisTemplate.opsForGeo().remove(cooperativesKey, cooperativeId.toString());
     }
 
     public GeoResults<RedisGeoCommands.GeoLocation<String>> searchNearby(
@@ -42,15 +39,14 @@ public class CooperativeGeoRepository {
             BigDecimal radiusKm,
             int limit
     ) {
-        GeoOperations<String, String> geo = redisTemplate.opsForGeo();
-        return geo.search(
-                cooperativesKey,
-                GeoReference.fromCoordinate(longitude.doubleValue(), latitude.doubleValue()),
-                new Distance(radiusKm.doubleValue(), Metrics.KILOMETERS),
-                RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs()
-                        .includeDistance()
-                        .sortAscending()
-                        .limit(limit)
-        );
+        GeoOperations<String, String> geoOperations = redisTemplate.opsForGeo();
+        GeoReference<String> origin = GeoReference.fromCoordinate(longitude.doubleValue(), latitude.doubleValue());
+        Distance radius = new Distance(radiusKm.doubleValue(), Metrics.KILOMETERS);
+        RedisGeoCommands.GeoSearchCommandArgs arguments = RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs()
+                .includeDistance()
+                .sortAscending()
+                .limit(limit);
+
+        return geoOperations.search(cooperativesKey, origin, radius, arguments);
     }
 }

@@ -1,170 +1,147 @@
 package com.volta.ranking;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import com.volta.ranking.config.LocalUsersConfiguration;
+import com.volta.ranking.support.HttpTestClient;
+import com.volta.ranking.support.TestTokens;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Sobe a aplicação de verdade (Tomcat em porta aleatória) para testar o tratamento de erros
- * ponta a ponta. Precisa ser um teste de integração real pelo mesmo motivo do
- * ValidacaoHttpIntegrationTest: a cadeia de filtros do Spring Security
- * (AuthorizationFilter → ExceptionTranslationFilter → RestAuthHandler) não é exercitada
- * pelo MockMvc.
- *
- * Não precisa de Redis: nenhum destes casos chega a consultar o ranking.
- */
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "JWT_KEY=chave-de-teste-com-mais-de-256-bits-para-o-algoritmo-hs512-1234567890"
-)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("local")
 class ErrorHandlingHttpIntegrationTest {
 
-    private static final Pattern TOKEN = Pattern.compile("\"token\"\\s*:\\s*\"([^\"]+)\"");
+    private static final String UNKNOWN_COMPANY_ID = "660e8400-e29b-41d4-a716-446655440099";
 
     @Value("${local.server.port}")
-    private int porta;
+    private int port;
 
-    private final HttpClient http = HttpClient.newHttpClient();
+    @Value("${volta.jwt.secret}")
+    private String jwtSecret;
 
-    @Test
-    void semToken_retorna401ComEnvelopePadrao() throws Exception {
-        HttpResponse<String> resposta = get("/api/v1/ranking/total", null);
+    private HttpTestClient client;
 
-        assertThat(resposta.statusCode()).isEqualTo(401);
-        assertThat(resposta.body()).contains("\"success\":false").contains("\"timestamp\"");
+    @BeforeEach
+    void setUp() {
+        client = new HttpTestClient(port);
     }
 
     @Test
-    void tokenInvalido_retorna401() throws Exception {
-        assertThat(get("/api/v1/ranking/total", "lixo.nao.valido").statusCode()).isEqualTo(401);
+    void returnsProblemDetailWhenTokenIsMissing() {
+        HttpResponse<String> response = client.get("/api/v1/ranking/total", null);
+
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertProblemDetail(response, 401, "/api/v1/ranking/total");
     }
 
     @Test
-    void jwtDaVoltaApi_comRoleEmployee_passaPeloFiltroDeSeguranca() throws Exception {
-        String token = Jwts.builder()
-                .subject("funcionario@volta.com")
-                .claim("userId", "770e8400-e29b-41d4-a716-446655440000")
-                .claim("companyId", "660e8400-e29b-41d4-a716-446655440000")
-                .claim("role", "EMPLOYEE")
-                .issuedAt(new java.util.Date())
-                .expiration(new java.util.Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(
-                        "chave-de-teste-com-mais-de-256-bits-para-o-algoritmo-hs512-1234567890"
-                                .getBytes(StandardCharsets.UTF_8)))
-                .compact();
+    void returnsUnauthorizedWhenTokenIsInvalid() {
+        HttpResponse<String> response = client.get("/api/v1/ranking/total", "garbage.not.valid");
 
-        HttpResponse<String> resposta = get(
+        assertThat(response.statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void acceptsTokenIssuedByVoltaApi() {
+        String token = TestTokens.voltaApiToken(jwtSecret, "EMPLOYEE", LocalUsersConfiguration.DEMO_COMPANY_ID);
+
+        HttpResponse<String> response = client.get(
                 "/api/v1/cooperatives/nearby?latitude=90&longitude=0&radiusKm=10", token);
 
-        // 400 confirma que o JWT autenticou e passou autorização; a consulta não chega ao Redis.
-        assertThat(resposta.statusCode()).isEqualTo(400);
+        assertThat(response.statusCode()).isEqualTo(400);
     }
 
     @Test
-    void autenticadoSemOPapel_retorna403ComEnvelopePadrao() throws Exception {
-        // Regressão: antes da correção, este caminho (filtro, não o GlobalExceptionHandler)
-        // devolvia um JSON escrito à mão, sem o campo "timestamp" que o resto da API tem.
-        String token = login("funcionario", "senha123");
+    void rejectsTokenWithUnknownRole() {
+        String token = TestTokens.voltaApiToken(jwtSecret, "STRANGER", LocalUsersConfiguration.DEMO_COMPANY_ID);
 
-        HttpResponse<String> resposta = post("/api/v1/ranking/score", token,
-                "{\"companyUuid\":\"550e8400-e29b-41d4-a716-446655440000\",\"score\":100}");
+        HttpResponse<String> response = client.get("/api/v1/ranking/total", token);
 
-        assertThat(resposta.statusCode()).isEqualTo(403);
-        assertThat(resposta.body()).contains("\"success\":false").contains("\"timestamp\"");
+        assertThat(response.statusCode()).isEqualTo(403);
     }
 
     @Test
-    void senhaErrada_retorna401() throws Exception {
-        assertThat(post("/api/v1/auth/login", null,
-                "{\"username\":\"admin\",\"password\":\"errada\"}").statusCode()).isEqualTo(401);
+    void returnsProblemDetailWhenRoleIsNotAllowed() {
+        String token = client.login("employee");
+
+        HttpResponse<String> response = client.post("/api/v1/ranking/score", token,
+                "{\"companyId\":\"550e8400-e29b-41d4-a716-446655440000\",\"score\":100}");
+
+        assertThat(response.statusCode()).isEqualTo(403);
+        assertProblemDetail(response, 403, "/api/v1/ranking/score");
     }
 
     @Test
-    void rotaInexistente_retorna404() throws Exception {
-        // Dois segmentos que não casam com nenhum template mapeado (nem {companyUuid}/posicao,
-        // nem {companyUuid}/pontuacao, nem {companyUuid} sozinho) — diferente de uma rota que
-        // bate no template de outro verbo, o que resultaria em 405, não 404.
-        String token = login("admin", "senha123");
+    void returnsUnauthorizedWhenPasswordIsWrong() {
+        HttpResponse<String> response = client.post("/api/v1/auth/login", null,
+                "{\"email\":\"admin@volta.com\",\"password\":\"wrong\"}");
 
-        assertThat(get("/api/v1/rota/completamente-inexistente", token).statusCode()).isEqualTo(404);
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertProblemDetail(response, 401, "/api/v1/auth/login");
     }
 
     @Test
-    void metodoNaoSuportado_retorna405() throws Exception {
-        String token = login("admin", "senha123");
+    void returnsNotFoundForUnknownRoute() {
+        String token = client.login("admin");
 
-        assertThat(enviar(requisicao("/api/v1/ranking/score", token)
-                .header("Content-Type", "application/json")
-                .PUT(BodyPublishers.ofString("{}"))
-                .build()).statusCode()).isEqualTo(405);
+        HttpResponse<String> response = client.get("/api/v1/route/does-not-exist", token);
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertProblemDetail(response, 404, "/api/v1/route/does-not-exist");
     }
 
     @Test
-    void jsonMalformado_retorna400() throws Exception {
-        String token = login("admin", "senha123");
+    void returnsMethodNotAllowedForUnsupportedMethod() {
+        String token = client.login("admin");
 
-        assertThat(post("/api/v1/ranking/score", token, "{quebrado").statusCode()).isEqualTo(400);
+        HttpResponse<String> response = client.put("/api/v1/ranking/score", token, "{}");
+
+        assertThat(response.statusCode()).isEqualTo(405);
+        assertProblemDetail(response, 405, "/api/v1/ranking/score");
     }
 
     @Test
-    void empresaNaoEncontrada_retorna404DeNegocio() throws Exception {
-        String token = login("admin", "senha123");
+    void returnsBadRequestWhenJsonIsMalformed() {
+        String token = client.login("admin");
 
-        HttpResponse<String> resposta = get(
-                "/api/v1/ranking/660e8400-e29b-41d4-a716-446655440099/posicao", token);
+        HttpResponse<String> response = client.post("/api/v1/ranking/score", token, "{broken");
 
-        assertThat(resposta.statusCode()).isEqualTo(404);
-        assertThat(resposta.body()).contains("não encontrada no ranking");
+        assertThat(response.statusCode()).isEqualTo(400);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
+    @Test
+    void returnsBadRequestWhenCompanyIdIsNotAnUuid() {
+        String token = client.login("admin");
 
-    private String login(String usuario, String senha) throws Exception {
-        HttpResponse<String> resposta = post("/api/v1/auth/login", null,
-                "{\"username\":\"" + usuario + "\",\"password\":\"" + senha + "\"}");
-        assertThat(resposta.statusCode()).as("login de %s", usuario).isEqualTo(200);
+        HttpResponse<String> response = client.get("/api/v1/ranking/not-a-uuid/position", token);
 
-        Matcher m = TOKEN.matcher(resposta.body());
-        assertThat(m.find()).as("token na resposta do login").isTrue();
-        return m.group(1);
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertProblemDetail(response, 400, "/api/v1/ranking/not-a-uuid/position");
     }
 
-    private HttpResponse<String> get(String caminho, String token) throws IOException, InterruptedException {
-        return enviar(requisicao(caminho, token).GET().build());
+    @Test
+    void returnsNotFoundWhenCompanyIsNotInRanking() {
+        String token = client.login("admin");
+
+        HttpResponse<String> response = client.get("/api/v1/ranking/" + UNKNOWN_COMPANY_ID + "/position", token);
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertProblemDetail(response, 404, "/api/v1/ranking/" + UNKNOWN_COMPANY_ID + "/position");
+        assertThat(response.body()).contains("Ranking entry not found");
     }
 
-    private HttpResponse<String> post(String caminho, String token, String json) throws IOException, InterruptedException {
-        return enviar(requisicao(caminho, token)
-                .header("Content-Type", "application/json")
-                .POST(BodyPublishers.ofString(json))
-                .build());
-    }
-
-    private HttpRequest.Builder requisicao(String caminho, String token) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + porta + caminho));
-        if (token != null) {
-            builder.header("Authorization", "Bearer " + token);
-        }
-        return builder;
-    }
-
-    private HttpResponse<String> enviar(HttpRequest requisicao) throws IOException, InterruptedException {
-        return http.send(requisicao, HttpResponse.BodyHandlers.ofString());
+    private void assertProblemDetail(HttpResponse<String> response, int status, String instance) {
+        assertThat(response.headers().firstValue("Content-Type").orElse(""))
+                .startsWith("application/problem+json");
+        assertThat(response.body())
+                .contains("\"status\":" + status)
+                .contains("\"detail\"")
+                .contains("\"instance\":\"" + instance + "\"");
     }
 }

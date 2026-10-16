@@ -1,115 +1,61 @@
 package com.volta.ranking.controller;
 
-import com.volta.ranking.dto.ApiResponseDTO;
-import com.volta.ranking.dto.CooperativeLocationRequestDTO;
-import com.volta.ranking.dto.NearbyCooperativeDTO;
-import com.volta.ranking.service.CooperativeGeoService;
-import com.volta.ranking.validation.ValidationPatterns;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import com.volta.ranking.controller.docs.CooperativeGeoControllerDocs;
+import com.volta.ranking.dto.cooperative.CooperativeLocationRequestDTO;
+import com.volta.ranking.dto.cooperative.NearbyCooperativeResponseDTO;
+import com.volta.ranking.usecase.CooperativeGeoUseCase;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/cooperatives")
 @RequiredArgsConstructor
-@Tag(name = "Cooperativas", description = "Índice geoespacial de cooperativas no Redis")
-@SecurityRequirement(name = "bearerAuth")
-public class CooperativeGeoController {
+@RequestMapping("/api/v1/cooperatives")
+public class CooperativeGeoController implements CooperativeGeoControllerDocs {
 
-    private final CooperativeGeoService cooperativeGeoService;
+    private final CooperativeGeoUseCase cooperativeGeoUseCase;
 
-    @PutMapping("/{cooperativeUuid}/location")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Adicionar ou atualizar a localização de uma cooperativa")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Localização atualizada"),
-            @ApiResponse(responseCode = "400", description = "UUID ou coordenadas inválidas"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Requer ADMIN")
-    })
-    public ResponseEntity<ApiResponseDTO<Void>> saveLocation(
-            @Parameter(description = "UUID da cooperativa")
-            @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
-            @PathVariable String cooperativeUuid,
-            @Valid @RequestBody CooperativeLocationRequestDTO request
+    @PutMapping("/{cooperativeId}/location")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveLocation(
+            @PathVariable UUID cooperativeId,
+            @Valid @RequestBody CooperativeLocationRequestDTO dto
     ) {
-        cooperativeGeoService.saveLocation(
-                UUID.fromString(cooperativeUuid), request.latitude(), request.longitude()
-        );
-        return ResponseEntity.ok(ApiResponseDTO.success("Localização da cooperativa atualizada.", null));
+        cooperativeGeoUseCase.saveLocation(cooperativeId, dto);
     }
 
-    @DeleteMapping("/{cooperativeUuid}/location")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Remover a localização de uma cooperativa do índice GEO")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Localização removida"),
-            @ApiResponse(responseCode = "400", description = "UUID inválido"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Requer ADMIN")
-    })
-    public ResponseEntity<ApiResponseDTO<Void>> removeLocation(
-            @Parameter(description = "UUID da cooperativa")
-            @Pattern(regexp = ValidationPatterns.UUID, message = ValidationPatterns.UUID_MESSAGE)
-            @PathVariable String cooperativeUuid
-    ) {
-        cooperativeGeoService.removeLocation(UUID.fromString(cooperativeUuid));
-        return ResponseEntity.ok(ApiResponseDTO.success("Localização da cooperativa removida.", null));
+    @DeleteMapping("/{cooperativeId}/location")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeLocation(@PathVariable UUID cooperativeId) {
+        cooperativeGeoUseCase.removeLocation(cooperativeId);
     }
 
     @GetMapping("/nearby")
-    @PreAuthorize("hasAnyRole('FUNCIONARIO','GESTOR','ADMIN')")
-    @Operation(
-            summary = "Buscar cooperativas próximas",
-            description = "Busca UUIDs e distância em quilômetros, ordenados do mais próximo. " +
-                    "A volta-api deve fornecer as coordenadas da empresa autenticada."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Busca concluída"),
-            @ApiResponse(responseCode = "400", description = "Coordenadas, raio ou limite inválidos"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Sem permissão")
-    })
-    public ResponseEntity<ApiResponseDTO<List<NearbyCooperativeDTO>>> findNearby(
-            @Parameter(description = "Latitude da empresa", example = "-23.550520")
-            @RequestParam
-            @DecimalMin("-85.051128") @DecimalMax("85.051128")
-            BigDecimal latitude,
-            @Parameter(description = "Longitude da empresa", example = "-46.633308")
-            @RequestParam
-            @DecimalMin("-180.0") @DecimalMax("180.0")
-            BigDecimal longitude,
-            @Parameter(description = "Raio da busca em quilômetros", example = "50")
-            @RequestParam
-            @DecimalMin(value = "0", inclusive = false) @DecimalMax("20000")
-            BigDecimal radiusKm,
-            @Parameter(description = "Máximo de cooperativas retornadas (1–100)", example = "20")
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100)
-            int limit
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'MANAGER', 'EMPLOYEE', 'OPERATOR')")
+    public List<NearbyCooperativeResponseDTO> findNearby(
+            @RequestParam BigDecimal latitude,
+            @RequestParam BigDecimal longitude,
+            @RequestParam BigDecimal radiusKm,
+            @RequestParam(defaultValue = "20") int limit
     ) {
-        List<NearbyCooperativeDTO> cooperatives = cooperativeGeoService.findNearby(
-                latitude, longitude, radiusKm, limit
-        );
-        return ResponseEntity.ok(ApiResponseDTO.success(
-                "Busca de cooperativas próximas concluída. Total: " + cooperatives.size() + ".",
-                cooperatives
-        ));
+        List<NearbyCooperativeResponseDTO> cooperatives =
+                cooperativeGeoUseCase.findNearby(latitude, longitude, radiusKm, limit);
+        return cooperatives;
     }
 }

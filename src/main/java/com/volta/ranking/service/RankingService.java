@@ -1,123 +1,155 @@
 package com.volta.ranking.service;
 
-import com.volta.ranking.dto.EmpresaRankingDTO;
-import com.volta.ranking.dto.PosicaoResponseDTO;
-import com.volta.ranking.dto.ScoreUpdateRequestDTO;
-import com.volta.ranking.exception.EmpresaNaoEncontradaException;
+import com.volta.ranking.dto.ranking.company.CompanyPositionResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyRankingResponseDTO;
+import com.volta.ranking.dto.ranking.company.CompanyScoreResponseDTO;
+import com.volta.ranking.dto.ranking.RankingTotalResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreBatchRequestDTO;
+import com.volta.ranking.dto.ranking.score.ScoreBatchResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreHistoryResponseDTO;
+import com.volta.ranking.dto.ranking.score.ScoreUpdateRequestDTO;
+import com.volta.ranking.exception.InvalidRequestException;
+import com.volta.ranking.exception.ResourceNotFoundException;
+import com.volta.ranking.mapper.RankingMapper;
 import com.volta.ranking.repository.RankingRepository;
+import com.volta.ranking.repository.ScoreHistoryRepository;
+import com.volta.ranking.security.AuthenticatedUser;
+import com.volta.ranking.usecase.RankingUseCase;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
-public class RankingService {
+public class RankingService implements RankingUseCase {
 
     private final RankingRepository rankingRepository;
+    private final ScoreHistoryRepository scoreHistoryRepository;
+    private final RankingMapper rankingMapper;
 
-    /**
-     * Adiciona ou atualiza o score de uma empresa.
-     * Redis: ZADD ranking:companies {score} "{uuid}"
-     */
-    public void adicionarOuAtualizarScore(ScoreUpdateRequestDTO request) {
-        log.info("[RANKING] score {} → empresa {} | motivo: {}",
-                request.getScore(), request.getCompanyUuid(), request.getMotivo());
+    public void updateScore(ScoreUpdateRequestDTO dto, AuthenticatedUser author) {
+        validateCompanyAccess(dto.companyId(), author);
 
-        rankingRepository.adicionarOuAtualizar(request.getCompanyUuid(), request.getScore());
-
-        log.info("[RANKING] score atualizado com sucesso para {}", request.getCompanyUuid());
+        saveScore(dto.companyId(), dto.score(), dto.reason(), author);
     }
 
-    /**
-     * Ranking completo ordenado do maior para o menor score.
-     * Redis: ZREVRANGE ranking:companies 0 -1 WITHSCORES
-     */
-    public List<EmpresaRankingDTO> consultarRankingCompleto() {
-        return toDTO(rankingRepository.consultarRankingCompleto());
+    public ScoreBatchResponseDTO loadScores(ScoreBatchRequestDTO dto, AuthenticatedUser author) {
+        for (ScoreUpdateRequestDTO item : dto.scores()) {
+            String reason = item.reason();
+
+            if (!StringUtils.hasText(reason)) {
+                reason = "Batch load";
+            }
+
+            saveScore(item.companyId(), item.score(), reason, author);
+        }
+
+        return new ScoreBatchResponseDTO(dto.scores().size());
     }
 
-    /**
-     * Top N empresas com maior pontuação.
-     * Redis: ZREVRANGE ranking:companies 0 {N-1} WITHSCORES
-     */
-    public List<EmpresaRankingDTO> consultarTopN(int limit) {
-        if (limit <= 0) throw new IllegalArgumentException("Limite deve ser maior que zero");
-        return toDTO(rankingRepository.consultarTopN(limit));
+    public List<CompanyRankingResponseDTO> getRanking(int page, int size) {
+        if (page < 0 || page > 100_000) {
+            throw new InvalidRequestException("Page must be between 0 and 100000");
+        }
+        validateLimit(size, "Size");
+
+        long start = (long) page * size;
+        long end = start + size - 1;
+        Set<ZSetOperations.TypedTuple<String>> tuples = rankingRepository.findRange(start, end);
+
+        return rankingMapper.toResponses(tuples, start);
     }
 
-    /**
-     * Posição, score e total de uma empresa específica.
-     * Redis: ZREVRANK + ZSCORE + ZCARD
-     */
-    public PosicaoResponseDTO consultarPosicao(String companyUuid) {
-        assertExiste(companyUuid);
+    public List<CompanyRankingResponseDTO> getTop(int limit) {
+        validateLimit(limit, "Limit");
 
-        Long posicaoRedis = rankingRepository.consultarPosicao(companyUuid);
-        Double score      = rankingRepository.consultarPontuacao(companyUuid);
-        Long total        = rankingRepository.contarTotal();
+        Set<ZSetOperations.TypedTuple<String>> tuples = rankingRepository.findRange(0, limit - 1L);
 
-        // Redis é 0-based (0 = 1º lugar), convertemos para 1-based
-        long posicaoHumana = (posicaoRedis != null ? posicaoRedis : 0L) + 1;
-
-        return PosicaoResponseDTO.builder()
-                .companyUuid(companyUuid)
-                .posicao(posicaoHumana)
-                .score(score)
-                .totalEmpresas(total)
-                .build();
+        return rankingMapper.toResponses(tuples, 0);
     }
 
-    /**
-     * Apenas o score numérico de uma empresa.
-     * Redis: ZSCORE ranking:companies "{uuid}"
-     */
-    public Double consultarPontuacao(String companyUuid) {
-        Double score = rankingRepository.consultarPontuacao(companyUuid);
-        if (score == null) throw new EmpresaNaoEncontradaException(companyUuid);
-        return score;
+    public CompanyPositionResponseDTO getPosition(UUID companyId, AuthenticatedUser author) {
+        validateCompanyAccess(companyId, author);
+
+        String member = companyId.toString();
+        Long zeroBasedPosition = rankingRepository.findPosition(member);
+        Double score = rankingRepository.findScore(member);
+
+        if (zeroBasedPosition == null || score == null) {
+            throw new ResourceNotFoundException("Ranking entry");
+        }
+
+        long total = rankingRepository.count();
+        long position = zeroBasedPosition + 1;
+
+        return new CompanyPositionResponseDTO(companyId, position, score, total);
     }
 
-    /**
-     * Remove empresa do ranking (ex: inativação no sistema).
-     * Redis: ZREM ranking:companies "{uuid}"
-     */
-    public void removerDoRanking(String companyUuid) {
-        assertExiste(companyUuid);
-        rankingRepository.remover(companyUuid);
-        log.info("[RANKING] empresa {} removida do ranking", companyUuid);
+    public CompanyScoreResponseDTO getScore(UUID companyId, AuthenticatedUser author) {
+        validateCompanyAccess(companyId, author);
+
+        Double score = rankingRepository.findScore(companyId.toString());
+
+        if (score == null) {
+            throw new ResourceNotFoundException("Ranking entry");
+        }
+
+        return new CompanyScoreResponseDTO(companyId, score);
     }
 
-    /** Total de empresas no ranking. Redis: ZCARD */
-    public Long consultarTotal() {
-        return rankingRepository.contarTotal();
+    public List<ScoreHistoryResponseDTO> getHistory(UUID companyId, int limit, AuthenticatedUser author) {
+        validateLimit(limit, "Limit");
+        validateCompanyAccess(companyId, author);
+
+        return scoreHistoryRepository.findByCompany(companyId.toString(), limit);
     }
 
-    // ─── helpers ─────────────────────────────────────────────────────────────
+    public RankingTotalResponseDTO getTotal() {
+        long total = rankingRepository.count();
+        return new RankingTotalResponseDTO(total);
+    }
 
-    private void assertExiste(String companyUuid) {
-        if (!rankingRepository.existe(companyUuid)) {
-            throw new EmpresaNaoEncontradaException(companyUuid);
+    public void remove(UUID companyId, AuthenticatedUser author) {
+        Long removed = rankingRepository.remove(companyId.toString());
+
+        if (removed == null || removed == 0) {
+            throw new ResourceNotFoundException("Ranking entry");
+        }
+
+        ScoreHistoryResponseDTO entry = new ScoreHistoryResponseDTO(
+                Instant.now(), null, "Removed from ranking", author.getUsername());
+        scoreHistoryRepository.save(companyId.toString(), entry);
+    }
+
+    private void saveScore(UUID companyId, double score, String reason, AuthenticatedUser author) {
+        String member = companyId.toString();
+        rankingRepository.save(member, score);
+
+        ScoreHistoryResponseDTO entry = new ScoreHistoryResponseDTO(
+                Instant.now(), score, reason, author.getUsername()
+        );
+        scoreHistoryRepository.save(member, entry);
+    }
+
+    private void validateLimit(int value, String name) {
+        if (value < 1 || value > 100) {
+            throw new InvalidRequestException(name + " must be between 1 and 100");
         }
     }
 
-    private List<EmpresaRankingDTO> toDTO(Set<ZSetOperations.TypedTuple<String>> tuples) {
-        List<EmpresaRankingDTO> result = new ArrayList<>();
-        if (tuples == null) return result;
-
-        int posicao = 1;
-        for (ZSetOperations.TypedTuple<String> t : tuples) {
-            result.add(EmpresaRankingDTO.builder()
-                    .posicao(posicao++)
-                    .companyUuid(t.getValue())
-                    .score(t.getScore())
-                    .build());
+    private void validateCompanyAccess(UUID companyId, AuthenticatedUser author) {
+        if ("ADMIN".equals(author.role())) {
+            return;
         }
-        return result;
+
+        if (!companyId.equals(author.companyId())) {
+            throw new ResourceNotFoundException("Ranking entry");
+        }
     }
 }
