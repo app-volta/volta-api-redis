@@ -162,6 +162,29 @@ Esta API consome dois endpoints de leitura da `volta-api`, ambos com `Authorizat
 
 `specialties` é a lista de categorias já normalizadas pela `volta-api`, que é quem conhece o enum `WasteCategory`. Esta API compara os nomes exatamente, sem normalizar texto.
 
+### Como a `volta-api` deve montar essas respostas
+
+Os dois endpoints só leem e reorganizam dados que a `volta-api` já tem. O mapeamento é:
+
+| Campo do contrato | Origem na `volta-api` |
+|---|---|
+| `incidentId` | `Incident.id` |
+| `priority` | `Incident.priority` |
+| `wasteType.category` | `Incident.wasteType.category` |
+| `wasteType.defaultRiskLevel` | `Incident.wasteType.defaultRiskLevel` |
+| `contaminationLevel` | `Incident.contaminationLevel`; se for nulo, `wasteType.defaultRiskLevel` |
+| `origin.latitude` e `origin.longitude` | **ainda não existe**: `Company` só tem `address` e `Area` só tem `locationDescription` |
+| `aiReport.*` | `AiReport` ligado à ocorrência (`detectedWasteType`, `aiContaminationLevel`, `recommendations`); `null` se não houver |
+| `id`, `name`, `latitude`, `longitude`, `averageRating` | `Cooperative` |
+| `specialties` | `Cooperative.specialties`, que é um texto separado por vírgula; o endpoint deve devolvê-lo como lista de categorias |
+
+Pontos a resolver na `volta-api`:
+
+- **Origem da ocorrência:** adicionar `latitude` e `longitude` (`DECIMAL(9,6)`, como em `Cooperative`) a `Area` ou a `Company`, com a migração correspondente, e preenchê-las no cadastro. Se a origem faltar, a `volta-api` deve devolver `origin: null` e esta API responde `422`.
+- **Isolamento:** `scoring-context` busca a ocorrência pelo `id` **e** pela `companyId` do token. Ocorrência de outra empresa responde `404`.
+- **Permissão:** `scoring-data` é uma rota nova com `@PreAuthorize` para `ADMIN`, `MANAGER` e `EMPLOYEE`. O `GET /cooperatives` atual continua só para `ADMIN`, porque devolve CNPJ e outros dados que o score não precisa.
+- **Resposta enxuta:** nenhum dos dois devolve CNPJ, fotos, descrição do funcionário ou texto completo do relatório de IA.
+
 Erros da `volta-api`: `404` vira `404`, `403` vira `403` e qualquer outra falha (incluindo timeout) vira `502`. A URL e o timeout são `VOLTA_API_URL` e `VOLTA_API_TIMEOUT_MILLIS`.
 
 ## Histórico de pontuação
@@ -249,7 +272,8 @@ A API sobe em `http://localhost:8081`. Não há valor padrão para `JWT_KEY`: o 
 | `JWT_EXPIRATION` | `86400000` | Validade do token, em ms |
 | `REDIS_HOST` | `localhost` | Host do Redis |
 | `REDIS_PORT` | `6379` | Porta do Redis |
-| `SPRING_DATA_REDIS_PASSWORD` | — | Senha opcional do Redis; configure em secret manager fora do local |
+| `REDIS_USERNAME` | vazio | Usuário do Redis (ACL); o Redis Cloud usa `default` |
+| `REDIS_PASSWORD` | vazio | Senha do Redis; fora do local, configure em secret manager |
 | `SPRING_DATA_REDIS_SSL_ENABLED` | `false` | Ative (`true`) TLS quando o provedor Redis exigir conexão criptografada |
 | `VOLTA_API_URL` | `http://localhost:8080` | URL da `volta-api`, usada no score de cooperativas |
 | `VOLTA_API_TIMEOUT_MILLIS` | `3000` | Timeout de conexão e leitura das chamadas à `volta-api` |
