@@ -115,7 +115,7 @@ class IncidentScoringHttpIntegrationTest {
                 "/api/v1/incidents/" + incidentId + "/cooperative-scores", client.login("employee"));
 
         assertThat(response.statusCode()).isEqualTo(422);
-        assertThat(response.body()).contains("origin coordinates");
+        assertThat(response.body()).contains("Company coordinates");
     }
 
     @Test

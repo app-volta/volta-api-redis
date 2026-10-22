@@ -63,17 +63,19 @@ public class CooperativeScoringService implements CooperativeScoringUseCase {
     }
 
     private void validateIncident(IncidentContextDTO incident) {
-        if (incident.priority() == null
+        if (
+                incident.priority() == null
                 || incident.wasteType() == null
                 || incident.wasteType().category() == null
-                || incident.wasteType().defaultRiskLevel() == null) {
-            throw new ExternalServiceException("Volta API");
+                || incident.wasteType().defaultRiskLevel() == null
+        ) {
+            throw new ExternalServiceException("Volta API incident context", "priority or waste type is missing");
         }
 
         CoordinatesDTO origin = incident.origin();
 
         if (origin == null || origin.latitude() == null || origin.longitude() == null) {
-            throw new BusinessRuleException("Incident origin coordinates are not registered");
+            throw new BusinessRuleException("Company coordinates are not registered");
         }
 
         if ("RADIOATIVO".equals(incident.wasteType().category())) {

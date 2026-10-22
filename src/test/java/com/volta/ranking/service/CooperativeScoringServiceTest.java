@@ -113,7 +113,7 @@ class CooperativeScoringServiceTest {
 
         when(voltaApiClient.getIncidentContext(incidentId, AUTHORIZATION)).thenReturn(withoutOrigin);
         assertThatThrownBy(() -> service.scoreCooperatives(incidentId, null, 10, AUTHORIZATION))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("origin");
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("Company coordinates");
 
         when(voltaApiClient.getIncidentContext(incidentId, AUTHORIZATION)).thenReturn(withoutLongitude);
         assertThatThrownBy(() -> service.scoreCooperatives(incidentId, null, 10, AUTHORIZATION))
@@ -147,7 +147,8 @@ class CooperativeScoringServiceTest {
             when(voltaApiClient.getIncidentContext(incidentId, AUTHORIZATION)).thenReturn(incident);
 
             assertThatThrownBy(() -> service.scoreCooperatives(incidentId, null, 10, AUTHORIZATION))
-                    .isInstanceOf(ExternalServiceException.class);
+                    .isInstanceOf(ExternalServiceException.class)
+                    .hasMessageContaining("priority or waste type is missing");
         }
     }
 

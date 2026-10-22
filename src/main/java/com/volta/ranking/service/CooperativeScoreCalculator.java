@@ -67,7 +67,11 @@ public class CooperativeScoreCalculator {
             }
 
             double distanceKm = GeoDistance.kilometers(
-                    origin.latitude(), origin.longitude(), cooperative.latitude(), cooperative.longitude());
+                    origin.latitude(),
+                    origin.longitude(),
+                    cooperative.latitude(),
+                    cooperative.longitude()
+            );
 
             if (distanceKm > radiusKm) {
                 continue;
@@ -90,10 +94,14 @@ public class CooperativeScoreCalculator {
             ScoreBreakdownResponseDTO breakdown = new ScoreBreakdownResponseDTO(
                     round(distanceFactor * 100),
                     round(ratingFactor * 100),
-                    round(fitFactor * 100));
+                    round(fitFactor * 100)
+            );
 
-            scores.add(new CooperativeScoreResponseDTO(
-                    cooperative.id(), cooperative.name(), round(score), round(distanceKm), breakdown));
+            scores.add(
+                    new CooperativeScoreResponseDTO(
+                        cooperative.id(), cooperative.name(), round(score), round(distanceKm), breakdown
+                    )
+            );
         }
 
         scores.sort(this::compare);

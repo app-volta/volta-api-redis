@@ -27,21 +27,26 @@ public class RestVoltaApiClient implements VoltaApiClient {
     }
 
     public IncidentContextDTO getIncidentContext(UUID incidentId, String authorization) {
-        IncidentContextDTO context = execute("Incident", () -> restClient.get()
+        IncidentContextDTO context = execute(
+                "Incident",
+                "incident context",
+                () -> restClient.get()
                 .uri("/incidents/{id}/scoring-context", incidentId)
                 .header(HttpHeaders.AUTHORIZATION, authorization)
                 .retrieve()
-                .body(IncidentContextDTO.class));
+                .body(IncidentContextDTO.class)
+        );
 
         if (context == null) {
-            throw new ExternalServiceException("Volta API");
+            throw new ExternalServiceException("Volta API incident context");
         }
 
         return context;
     }
 
     public List<CooperativeDataDTO> getCooperatives(String authorization) {
-        List<CooperativeDataDTO> cooperatives = execute("Cooperatives", () -> restClient.get()
+        List<CooperativeDataDTO> cooperatives = execute("Cooperatives", "cooperatives",
+                () -> restClient.get()
                 .uri("/cooperatives/scoring-data")
                 .header(HttpHeaders.AUTHORIZATION, authorization)
                 .retrieve()
@@ -49,13 +54,13 @@ public class RestVoltaApiClient implements VoltaApiClient {
                 }));
 
         if (cooperatives == null) {
-            throw new ExternalServiceException("Volta API");
+            throw new ExternalServiceException("Volta API cooperatives");
         }
 
         return cooperatives;
     }
 
-    private <T> T execute(String resource, Supplier<T> call) {
+    private <T> T execute(String resource, String source, Supplier<T> call) {
         try {
             return call.get();
         } catch (HttpClientErrorException exception) {
@@ -65,9 +70,9 @@ public class RestVoltaApiClient implements VoltaApiClient {
             if (exception.getStatusCode() == HttpStatus.FORBIDDEN) {
                 throw new AccessDeniedException("Volta API denied access to " + resource);
             }
-            throw new ExternalServiceException("Volta API");
+            throw new ExternalServiceException("Volta API " + source);
         } catch (RestClientException | IllegalArgumentException exception) {
-            throw new ExternalServiceException("Volta API");
+            throw new ExternalServiceException("Volta API " + source);
         }
     }
 }
