@@ -70,6 +70,47 @@ class RestVoltaApiClientTest {
     }
 
     @Test
+    void readsAnIncidentContextWithoutOriginAndAiReport() {
+        String body = """
+                {
+                  "incidentId": "%s",
+                  "priority": "LOW",
+                  "wasteType": {"category": "PLASTICO", "defaultRiskLevel": "LOW"},
+                  "contaminationLevel": "LOW",
+                  "origin": null,
+                  "aiReport": null
+                }
+                """.formatted(incidentId);
+        server.expect(requestTo("http://volta-api/incidents/" + incidentId + "/scoring-context"))
+                .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        IncidentContextDTO context = client.getIncidentContext(incidentId, AUTHORIZATION);
+
+        assertThat(context.origin()).isNull();
+        assertThat(context.aiReport()).isNull();
+        assertThat(context.wasteType().category()).isEqualTo("PLASTICO");
+    }
+
+    @Test
+    void readsCooperativesWithEmptySpecialtiesAndWithoutRating() {
+        String body = """
+                [{"id": "%s", "name": "Sem especialidade", "latitude": -23.561684, "longitude": -46.655981,
+                  "averageRating": null, "specialties": []}]
+                """.formatted(UUID.randomUUID());
+        server.expect(requestTo("http://volta-api/cooperatives/scoring-data"))
+                .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<CooperativeDataDTO> cooperatives = client.getCooperatives(AUTHORIZATION);
+
+        assertThat(cooperatives).singleElement().satisfies(cooperative -> {
+            assertThat(cooperative.specialties()).isEmpty();
+            assertThat(cooperative.averageRating()).isNull();
+            assertThat(cooperative.latitude()).isEqualByComparingTo("-23.561684");
+            assertThat(cooperative.longitude()).isEqualByComparingTo("-46.655981");
+        });
+    }
+
+    @Test
     void readsTheCooperativeList() {
         String id = UUID.randomUUID().toString();
         String body = """

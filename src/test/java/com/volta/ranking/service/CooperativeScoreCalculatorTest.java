@@ -112,6 +112,23 @@ class CooperativeScoreCalculatorTest {
     }
 
     @Test
+    void doesNotNormalizeACategoryOutsideTheContract() {
+        IncidentContextDTO incident = incident("MEDIUM", "Não reciclável", "LOW", null, null);
+        CooperativeDataDTO cooperative = cooperative("Recicla", ORIGIN_LATITUDE, "5.00", "NAO_RECICLAVEL");
+
+        assertThat(calculator.score(incident, List.of(cooperative), 100)).isEmpty();
+    }
+
+    @Test
+    void skipsCooperativesWithEmptySpecialties() {
+        IncidentContextDTO incident = incident("MEDIUM", "PLASTICO", "LOW", null, null);
+        CooperativeDataDTO cooperative = new CooperativeDataDTO(
+                UUID.randomUUID(), "Vazia", ORIGIN_LATITUDE, ORIGIN_LONGITUDE, new BigDecimal("5"), List.of());
+
+        assertThat(calculator.score(incident, List.of(cooperative), 100)).isEmpty();
+    }
+
+    @Test
     void requiresTheHazardousSpecialtyWhenTheWasteTypeIsHighRisk() {
         IncidentContextDTO incident = incident("HIGH", "PERIGOSO", "HIGH", null, null);
         CooperativeDataDTO qualified = cooperative("Qualified", ORIGIN_LATITUDE, "3", "PERIGOSO,METAL");

@@ -2,7 +2,7 @@
 
 API auxiliar do Volta para o ranking de empresas e o índice geoespacial de cooperativas, feita em Java 21 + Spring Boot 4 usando Redis.
 
-O ranking usa um Sorted Set (`ranking:companies`) e o histórico de pontuação usa uma lista por empresa (`ranking:history:{companyId}`). A proximidade usa Redis GEO (`geo:cooperatives`), com os IDs das cooperativas como membros. O PostgreSQL da `volta-api` continua sendo a fonte da verdade; este serviço guarda índices derivados. A `volta-api` informa o ponto de origem da empresa e completa os dados das cooperativas a partir dos IDs retornados.
+O ranking usa um Sorted Set (`ranking:companies`) e o histórico de pontuação usa uma lista por empresa (`ranking:history:{companyId}`). A proximidade usa Redis GEO (`geo:cooperatives`), com os IDs das cooperativas como membros. O PostgreSQL da `volta-api` continua sendo a fonte da verdade; este serviço guarda índices derivados. A `volta-api` informa o ponto de origem (as coordenadas da empresa) e completa os dados das cooperativas a partir dos IDs retornados.
 
 ## Endpoints
 
@@ -86,7 +86,7 @@ Erros de validação do corpo incluem o campo `errors`, com a mensagem de cada c
 
 ## Score de cooperativas para uma ocorrência
 
-`GET /api/v1/incidents/{incidentId}/cooperative-scores` calcula, aqui, o quanto cada cooperativa é adequada para receber uma ocorrência. Os dados vêm da `volta-api`: a ocorrência com a análise de IA do `volta-chatbot` (que a `volta-api` já guarda no relatório da ocorrência), a origem da ocorrência e as cooperativas, com latitude e longitude. A distância é calculada aqui (fórmula de Haversine, em linha reta). O resultado não é gravado: cada chamada recalcula.
+`GET /api/v1/incidents/{incidentId}/cooperative-scores` calcula, aqui, o quanto cada cooperativa é adequada para receber uma ocorrência. Os dados vêm da `volta-api`: a ocorrência com a análise de IA do `volta-chatbot` (que a `volta-api` já guarda no relatório da ocorrência), a origem (as coordenadas da empresa) e as cooperativas, com latitude e longitude. A distância é calculada aqui (fórmula de Haversine, em linha reta). O resultado não é gravado: cada chamada recalcula.
 
 O token do usuário é repassado à `volta-api`, que continua aplicando o isolamento por empresa. Uma ocorrência de outra empresa responde `404`.
 
@@ -98,7 +98,7 @@ Uma cooperativa só é avaliada se atender às mesmas regras que a `volta-api` a
 - quando o tipo de resíduo tem risco padrão `HIGH`, a cooperativa tem a especialidade `PERIGOSO`;
 - está dentro do raio informado (padrão 100 km, máximo 20.000 km).
 
-Resíduo `RADIOATIVO` responde `422`, porque não pode ser destinado a cooperativas. Ocorrência sem coordenadas de origem também responde `422`.
+Resíduo `RADIOATIVO` responde `422`, porque não pode ser destinado a cooperativas. Empresa sem coordenadas cadastradas (`origin: null`) também responde `422` com "Company coordinates are not registered".
 
 ### Como o score é calculado
 
@@ -117,7 +117,7 @@ A ocorrência tem risco alto (`highRisk` na resposta) quando o risco padrão do 
 | `HIGH` ou `CRITICAL` | 0,6 | 0,2 | 0,2 |
 | `LOW` ou `MEDIUM` | 0,4 | 0,3 | 0,3 |
 
-Os pesos, o valor neutro da nota, a penalidade de adequação e o raio padrão ficam em `volta.scoring.*` no `application.yml`. O empate é desfeito pela menor distância e depois pelo nome. A resposta traz o `breakdown` (0 a 100) de cada critério e o `highRisk` usado.
+Os pesos, o valor neutro da nota, a penalidade de adequação e o raio padrão ficam em `volta.scoring.*` no `application.yml`. O empate é desfeito pela menor distância e depois pelo nome. A resposta traz o `breakdown` (0 a 100) de cada critério e o `highRisk` usado. Cada valor pode ser sobrescrito por variável de ambiente sem novo deploy de código, por exemplo `VOLTA_SCORING_URGENT_WEIGHTS_DISTANCE=0.5`.
 
 ### Contrato que a `volta-api` precisa expor
 
@@ -140,9 +140,9 @@ Esta API consome dois endpoints de leitura da `volta-api`, ambos com `Authorizat
 }
 ```
 
-- `priority` (`LOW`, `MEDIUM`, `HIGH` ou `CRITICAL`), `category`, `defaultRiskLevel` e `contaminationLevel` (`LOW`, `MEDIUM` ou `HIGH`) vão como texto, nos nomes canônicos da `volta-api`. `priority`, `wasteType.category` e `wasteType.defaultRiskLevel` são obrigatórios; sem eles a resposta é `502`.
+- `priority` (`LOW`, `MEDIUM`, `HIGH` ou `CRITICAL`), `category`, `defaultRiskLevel` e `contaminationLevel` (`LOW`, `MEDIUM` ou `HIGH`) vão como texto, nos nomes canônicos da `volta-api`. `priority`, `wasteType.category` e `wasteType.defaultRiskLevel` são obrigatórios; sem eles a resposta é `502` ("returned an incomplete response: priority or waste type is missing").
 - `contaminationLevel` deve ser o nível já resolvido (informado ou, na falta, o risco padrão do tipo de resíduo).
-- `origin` é o ponto de onde a distância é medida. Hoje a empresa não tem latitude e longitude na `volta-api`; é preciso definir de onde esse ponto vem (sede da empresa ou da área).
+- `origin` é o ponto de onde a distância é medida: a latitude e a longitude da empresa da ocorrência. `null` quando a empresa não tem coordenadas cadastradas.
 - `aiReport` pode ser `null` quando a ocorrência não tem análise de IA. Só o `aiContaminationLevel` entra no cálculo.
 
 `GET /cooperatives/scoring-data`, lista com os dados de todas as cooperativas (hoje `GET /cooperatives` é exclusivo do `ADMIN`):
@@ -173,19 +173,19 @@ Os dois endpoints só leem e reorganizam dados que a `volta-api` já tem. O mape
 | `wasteType.category` | `Incident.wasteType.category` |
 | `wasteType.defaultRiskLevel` | `Incident.wasteType.defaultRiskLevel` |
 | `contaminationLevel` | `Incident.contaminationLevel`; se for nulo, `wasteType.defaultRiskLevel` |
-| `origin.latitude` e `origin.longitude` | **ainda não existe**: `Company` só tem `address` e `Area` só tem `locationDescription` |
+| `origin.latitude` e `origin.longitude` | `Company.latitude` e `Company.longitude`; `null` se a empresa não tiver coordenadas |
 | `aiReport.*` | `AiReport` ligado à ocorrência (`detectedWasteType`, `aiContaminationLevel`, `recommendations`); `null` se não houver |
 | `id`, `name`, `latitude`, `longitude`, `averageRating` | `Cooperative` |
 | `specialties` | `Cooperative.specialties`, que é um texto separado por vírgula; o endpoint deve devolvê-lo como lista de categorias |
 
 Pontos a resolver na `volta-api`:
 
-- **Origem da ocorrência:** adicionar `latitude` e `longitude` (`DECIMAL(9,6)`, como em `Cooperative`) a `Area` ou a `Company`, com a migração correspondente, e preenchê-las no cadastro. Se a origem faltar, a `volta-api` deve devolver `origin: null` e esta API responde `422`.
+- **Origem da ocorrência:** vem das coordenadas da empresa. Se a empresa não tiver coordenadas, a `volta-api` devolve `origin: null` e esta API responde `422`, orientando o cadastro da localização da empresa.
 - **Isolamento:** `scoring-context` busca a ocorrência pelo `id` **e** pela `companyId` do token. Ocorrência de outra empresa responde `404`.
 - **Permissão:** `scoring-data` é uma rota nova com `@PreAuthorize` para `ADMIN`, `MANAGER` e `EMPLOYEE`. O `GET /cooperatives` atual continua só para `ADMIN`, porque devolve CNPJ e outros dados que o score não precisa.
 - **Resposta enxuta:** nenhum dos dois devolve CNPJ, fotos, descrição do funcionário ou texto completo do relatório de IA.
 
-Erros da `volta-api`: `404` vira `404`, `403` vira `403` e qualquer outra falha (incluindo timeout) vira `502`. A URL e o timeout são `VOLTA_API_URL` e `VOLTA_API_TIMEOUT_MILLIS`.
+Erros da `volta-api`: `404` vira `404`, `403` vira `403` e qualquer outra falha (incluindo timeout) vira `502`. A mensagem do `502` indica a origem: "Volta API incident context" ou "Volta API cooperatives". A URL e o timeout são `VOLTA_API_URL` e `VOLTA_API_TIMEOUT_MILLIS`.
 
 ## Histórico de pontuação
 
