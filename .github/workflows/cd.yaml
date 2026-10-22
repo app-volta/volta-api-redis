@@ -1,0 +1,94 @@
+name: CD
+
+on:
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente de destino (rebuild a partir do commit atual)'
+        required: true
+        type: choice
+        options: [qa, prod]
+        default: qa
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: setup
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.resolve.outputs.environment }}
+    steps:
+      - name: Resolver ambiente pela branch
+        id: resolve
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_ENV: ${{ inputs.environment }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            ENVIRONMENT="$INPUT_ENV"
+          elif [ "$REF_NAME" = "main" ]; then
+            ENVIRONMENT="prod"
+          else
+            ENVIRONMENT="qa"
+          fi
+
+          echo "environment=${ENVIRONMENT}" >> "$GITHUB_OUTPUT"
+          echo "Ambiente resolvido: ${ENVIRONMENT}"
+
+  build-test:
+    name: build-test
+    needs: setup
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build, testes e empacotamento
+        env:
+          JWT_KEY: test-key-with-at-least-256-bits-for-hs512-test-only
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: mvn --batch-mode verify
+
+  docker:
+    name: docker
+    needs: [setup, build-test]
+    permissions:
+      contents: read
+      packages: write
+    uses: app-volta/volta-devops/.github/workflows/reusable-docker-build-push.yaml@v1
+    with:
+      image-name: api-redis
+      environment: ${{ needs.setup.outputs.environment }}
+      context: .
+      dockerfile: ./Dockerfile
+      push: true
+      notify-devops: true
+    secrets:
+      devops-dispatch-token: ${{ secrets.DEVOPS_DISPATCH_TOKEN }}

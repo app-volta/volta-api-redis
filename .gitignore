@@ -1,0 +1,27 @@
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+### IDEs ###
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.sts4-cache
+.apt_generated
+
+### Segredos e configuração local (repositório público!) ###
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.properties
+
+### SO ###
+.DS_Store
+Thumbs.db
