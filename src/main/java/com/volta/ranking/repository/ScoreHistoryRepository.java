@@ -29,7 +29,12 @@ public class ScoreHistoryRepository {
     }
 
     public List<ScoreHistoryResponseDTO> findByCompany(String companyId, int limit) {
-        List<String> items = redisTemplate.opsForList().range(buildKey(companyId), 0, limit - 1L);
+        List<String> items = redisTemplate.opsForList()
+                .range(
+                    buildKey(companyId),
+                    0,
+                    limit - 1L
+                );
         List<ScoreHistoryResponseDTO> history = new ArrayList<>();
 
         if (items == null) {
